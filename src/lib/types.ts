@@ -18,6 +18,8 @@ export type Stop = {
   signalDelay?: SignalDelay;
   boarding: number;
   alighting: number;
+  dwellSeconds?: number;
+  intersectionName?: string;
   notes?: string;
 };
 

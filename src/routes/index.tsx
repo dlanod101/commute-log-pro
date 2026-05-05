@@ -218,8 +218,8 @@ function App() {
               <Bus className="h-5 w-5" />
             </div>
             <div>
-              <h1 className="text-base font-semibold leading-none">TransitOne</h1>
-              <p className="text-[11px] text-muted-foreground">Field data collection</p>
+              <h1 className="text-base font-semibold leading-none">T-data fetcher</h1>
+              <p className="text-[11px] text-muted-foreground">Transit field data collection</p>
             </div>
           </div>
           <div className="flex items-center gap-2">
@@ -418,7 +418,7 @@ function ActiveTripView({
                   {i < trip.stops.length - 1 && <div className="my-1 w-px flex-1 bg-border" />}
                 </div>
                 <div className="flex-1 pb-1">
-                  <div className="flex items-center gap-2">
+                  <div className="flex flex-wrap items-center gap-2">
                     {s.type === "signalized" ? (
                       <Badge className="gap-1 bg-signal text-signal-foreground hover:bg-signal">
                         <TrafficCone className="h-3 w-3" /> Signal · {s.signalDelay}
@@ -428,10 +428,18 @@ function ActiveTripView({
                         <MapPin className="h-3 w-3" /> Stop
                       </Badge>
                     )}
+                    {s.dwellSeconds != null && (
+                      <Badge variant="outline" className="font-mono text-[10px]">
+                        dwell {s.dwellSeconds}s
+                      </Badge>
+                    )}
                     <span className="font-mono text-[11px] text-muted-foreground">
                       {new Date(s.ts).toLocaleTimeString()}
                     </span>
                   </div>
+                  {s.intersectionName && (
+                    <div className="mt-1 text-xs font-medium">{s.intersectionName}</div>
+                  )}
                   <div className="mt-1 text-sm">
                     <span className="font-mono">+{s.boarding}</span> board ·{" "}
                     <span className="font-mono">-{s.alighting}</span> alight
@@ -494,6 +502,10 @@ function StopDialog({
   const [board, setBoard] = useState("0");
   const [alight, setAlight] = useState("0");
   const [notes, setNotes] = useState("");
+  const [intersection, setIntersection] = useState("");
+  const [dwellStart, setDwellStart] = useState<number | null>(null);
+  const [dwellPaused, setDwellPaused] = useState<number>(0);
+  const [tick, setTick] = useState(0);
 
   useEffect(() => {
     if (open) {
@@ -502,12 +514,26 @@ function StopDialog({
       setBoard("0");
       setAlight("0");
       setNotes("");
+      setIntersection("");
+      setDwellStart(Date.now());
+      setDwellPaused(0);
     }
   }, [open]);
 
+  useEffect(() => {
+    if (!open || dwellStart === null) return;
+    const t = setInterval(() => setTick((x) => x + 1), 250);
+    return () => clearInterval(t);
+  }, [open, dwellStart]);
+
+  const dwellMs = dwellStart === null ? dwellPaused : dwellPaused + (Date.now() - dwellStart);
+  const dwellSec = Math.round(dwellMs / 1000);
+  // reference tick to satisfy linter
+  void tick;
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
+      <DialogContent className="max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>{title}</DialogTitle>
         </DialogHeader>
@@ -535,27 +561,69 @@ function StopDialog({
             </button>
           </div>
 
-          {type === "signalized" && (
-            <div className="space-y-2">
-              <Label>Signal delay</Label>
-              <RadioGroup
-                value={delay}
-                onValueChange={(v) => setDelay(v as SignalDelay)}
-                className="grid grid-cols-3 gap-2"
+          <div className="rounded-lg border bg-secondary/40 p-3">
+            <div className="flex items-center justify-between">
+              <div>
+                <div className="text-[10px] uppercase tracking-widest text-muted-foreground">
+                  Dwell time
+                </div>
+                <div className="font-mono text-2xl font-semibold tabular-nums">
+                  {fmtDuration(dwellMs)}
+                </div>
+              </div>
+              <Button
+                type="button"
+                size="sm"
+                variant={dwellStart === null ? "default" : "outline"}
+                onClick={() => {
+                  if (dwellStart === null) {
+                    setDwellStart(Date.now());
+                  } else {
+                    setDwellPaused(dwellPaused + (Date.now() - dwellStart));
+                    setDwellStart(null);
+                  }
+                }}
               >
-                {(["none", "short", "long"] as const).map((v) => (
-                  <Label
-                    key={v}
-                    className={`flex cursor-pointer items-center justify-center gap-2 rounded-lg border p-2 text-xs capitalize ${
-                      delay === v ? "border-primary bg-secondary" : ""
-                    }`}
-                  >
-                    <RadioGroupItem value={v} className="sr-only" />
-                    {v}
-                  </Label>
-                ))}
-              </RadioGroup>
+                {dwellStart === null ? "Resume" : "Stop timer"}
+              </Button>
             </div>
+            <p className="mt-2 text-[11px] text-muted-foreground">
+              Auto-started when stop logged. Stop the timer when the vehicle moves.
+            </p>
+          </div>
+
+          {type === "signalized" && (
+            <>
+              <div className="space-y-2">
+                <Label>Signalized intersection (area / name)</Label>
+                <Input
+                  value={intersection}
+                  onChange={(e) => setIntersection(e.target.value)}
+                  maxLength={120}
+                  placeholder="e.g. 5th Ave & Main St"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Signal delay</Label>
+                <RadioGroup
+                  value={delay}
+                  onValueChange={(v) => setDelay(v as SignalDelay)}
+                  className="grid grid-cols-3 gap-2"
+                >
+                  {(["none", "short", "long"] as const).map((v) => (
+                    <Label
+                      key={v}
+                      className={`flex cursor-pointer items-center justify-center gap-2 rounded-lg border p-2 text-xs capitalize ${
+                        delay === v ? "border-primary bg-secondary" : ""
+                      }`}
+                    >
+                      <RadioGroupItem value={v} className="sr-only" />
+                      {v}
+                    </Label>
+                  ))}
+                </RadioGroup>
+              </div>
+            </>
           )}
 
           <div className="grid grid-cols-2 gap-3">
@@ -590,6 +658,11 @@ function StopDialog({
               onSubmit({
                 type,
                 signalDelay: type === "signalized" ? delay : undefined,
+                intersectionName:
+                  type === "signalized" && intersection.trim()
+                    ? intersection.trim()
+                    : undefined,
+                dwellSeconds: dwellSec,
                 boarding: Math.max(0, parseInt(board) || 0),
                 alighting: Math.max(0, parseInt(alight) || 0),
                 notes: notes.trim() || undefined,
