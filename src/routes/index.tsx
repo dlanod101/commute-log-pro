@@ -418,7 +418,7 @@ function ActiveTripView({
                   {i < trip.stops.length - 1 && <div className="my-1 w-px flex-1 bg-border" />}
                 </div>
                 <div className="flex-1 pb-1">
-                  <div className="flex items-center gap-2">
+                  <div className="flex flex-wrap items-center gap-2">
                     {s.type === "signalized" ? (
                       <Badge className="gap-1 bg-signal text-signal-foreground hover:bg-signal">
                         <TrafficCone className="h-3 w-3" /> Signal · {s.signalDelay}
@@ -428,10 +428,18 @@ function ActiveTripView({
                         <MapPin className="h-3 w-3" /> Stop
                       </Badge>
                     )}
+                    {s.dwellSeconds != null && (
+                      <Badge variant="outline" className="font-mono text-[10px]">
+                        dwell {s.dwellSeconds}s
+                      </Badge>
+                    )}
                     <span className="font-mono text-[11px] text-muted-foreground">
                       {new Date(s.ts).toLocaleTimeString()}
                     </span>
                   </div>
+                  {s.intersectionName && (
+                    <div className="mt-1 text-xs font-medium">{s.intersectionName}</div>
+                  )}
                   <div className="mt-1 text-sm">
                     <span className="font-mono">+{s.boarding}</span> board ·{" "}
                     <span className="font-mono">-{s.alighting}</span> alight
