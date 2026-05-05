@@ -218,8 +218,8 @@ function App() {
               <Bus className="h-5 w-5" />
             </div>
             <div>
-              <h1 className="text-base font-semibold leading-none">TransitOne</h1>
-              <p className="text-[11px] text-muted-foreground">Field data collection</p>
+              <h1 className="text-base font-semibold leading-none">T-data fetcher</h1>
+              <p className="text-[11px] text-muted-foreground">Transit field data collection</p>
             </div>
           </div>
           <div className="flex items-center gap-2">
