@@ -29,6 +29,8 @@ import {
   Wifi,
   WifiOff,
   Download,
+  ArrowDownToLine,
+  ArrowUpFromLine,
 } from "lucide-react";
 import { useGps } from "@/hooks/use-gps";
 import {
@@ -353,10 +355,16 @@ function ActiveTripView({
 }) {
   const [stopOpen, setStopOpen] = useState(false);
   const [endOpen, setEndOpen] = useState(false);
-  const passengers = useMemo(() => {
+  const { passengers, totalBoard, totalAlight } = useMemo(() => {
     let p = trip.initialPassengers;
-    for (const s of trip.stops) p += s.boarding - s.alighting;
-    return p;
+    let b = 0;
+    let a = 0;
+    for (const s of trip.stops) {
+      p += s.boarding - s.alighting;
+      b += s.boarding;
+      a += s.alighting;
+    }
+    return { passengers: p, totalBoard: b, totalAlight: a };
   }, [trip]);
 
   const elapsed = (trip.endedAt ?? now) - trip.startedAt;
@@ -382,6 +390,39 @@ function ActiveTripView({
         <TripStatBadge label="Onboard" value={String(passengers)} />
         <TripStatBadge label="Stops" value={String(trip.stops.length)} accent />
       </div>
+
+      <Card className="p-4">
+        <div className="mb-3 flex items-center justify-between">
+          <h3 className="text-sm font-semibold">Passenger movement</h3>
+          <span className="text-[10px] uppercase tracking-widest text-muted-foreground">
+            start: {trip.initialPassengers}
+          </span>
+        </div>
+        <div className="grid grid-cols-3 gap-2">
+          <div className="rounded-xl border bg-success/10 p-3 text-center">
+            <div className="flex items-center justify-center gap-1 text-[10px] uppercase tracking-widest text-success">
+              <ArrowDownToLine className="h-3 w-3" /> Boarded
+            </div>
+            <div className="mt-1 font-mono text-2xl font-semibold tabular-nums text-success">
+              {totalBoard}
+            </div>
+          </div>
+          <div className="rounded-xl border bg-destructive/10 p-3 text-center">
+            <div className="flex items-center justify-center gap-1 text-[10px] uppercase tracking-widest text-destructive">
+              <ArrowUpFromLine className="h-3 w-3" /> Alighted
+            </div>
+            <div className="mt-1 font-mono text-2xl font-semibold tabular-nums text-destructive">
+              {totalAlight}
+            </div>
+          </div>
+          <div className="rounded-xl border bg-secondary p-3 text-center">
+            <div className="text-[10px] uppercase tracking-widest text-muted-foreground">
+              Onboard
+            </div>
+            <div className="mt-1 font-mono text-2xl font-semibold tabular-nums">{passengers}</div>
+          </div>
+        </div>
+      </Card>
 
       <div className="grid grid-cols-2 gap-3">
         <Button size="lg" onClick={() => setStopOpen(true)} className="h-16 gap-2">
