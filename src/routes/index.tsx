@@ -29,6 +29,8 @@ import {
   Wifi,
   WifiOff,
   Download,
+  ArrowDownToLine,
+  ArrowUpFromLine,
 } from "lucide-react";
 import { useGps } from "@/hooks/use-gps";
 import {
