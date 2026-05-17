@@ -1,3 +1,4 @@
+import { exportTripSummaryCSV, exportStopsCSV, exportGPSCSV } from "@/lib/exportCsv";
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
@@ -14,7 +15,12 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Toaster } from "@/components/ui/sonner";
 import { toast } from "sonner";
 import {
@@ -22,7 +28,6 @@ import {
   Navigation,
   Square,
   Plus,
-  TrafficCone,
   Upload,
   Bus,
   Trash2,
@@ -40,7 +45,7 @@ import {
   saveActive,
   saveTrips,
 } from "@/lib/storage";
-import type { Stop, Trip, SignalDelay } from "@/lib/types";
+import type { Stop, Trip } from "@/lib/types";
 import { TripStatBadge } from "@/components/TripStatBadge";
 
 export const Route = createFileRoute("/")({
@@ -59,6 +64,164 @@ function fmtDuration(ms: number) {
 
 function fmtKm(m: number) {
   return `${(m / 1000).toFixed(2)} km`;
+}
+
+// ========== SINGLE TRIP EXPORTS ==========
+function exportSingleTripCSV(trip: Trip) {
+  const rows = [[
+    "id", "origin", "destination", "fare", "initialPassengers",
+    "startedAt", "endedAt", "distanceMeters", "uploaded"
+  ]];
+  rows.push([
+    trip.id, trip.origin, trip.destination, String(trip.fare), String(trip.initialPassengers),
+    new Date(trip.startedAt).toISOString(),
+    trip.endedAt ? new Date(trip.endedAt).toISOString() : "",
+    String(trip.distanceMeters),
+    String(trip.uploaded)
+  ]);
+  const csv = rows.map(row => row.join(",")).join("\n");
+  const blob = new Blob([csv], { type: "text/csv" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `trip-${trip.id}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+  toast.success("Trip CSV downloaded");
+}
+
+function exportSingleStopsCSV(trip: Trip) {
+  const rows = [["tripId", "stopId", "ts", "lat", "lng", "type", "boarding", "alighting", "dwellSeconds", "notes"]];
+  trip.stops.forEach(s => {
+    rows.push([
+      trip.id, s.id, new Date(s.ts).toISOString(),
+      s.lat !== null ? String(s.lat) : "",
+      s.lng !== null ? String(s.lng) : "",
+      s.type, String(s.boarding), String(s.alighting),
+      s.dwellSeconds !== undefined ? String(s.dwellSeconds) : "",
+      s.notes || ""
+    ]);
+  });
+  const csv = rows.map(row => row.join(",")).join("\n");
+  const blob = new Blob([csv], { type: "text/csv" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `trip-${trip.id}-stops.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+  toast.success("Stops CSV downloaded");
+}
+
+function exportSingleGPSCSV(trip: Trip) {
+  const rows = [["tripId", "ts", "lat", "lng"]];
+  trip.gps.forEach(g => {
+    rows.push([trip.id, new Date(g.ts).toISOString(), String(g.lat), String(g.lng)]);
+  });
+  const csv = rows.map(row => row.join(",")).join("\n");
+  const blob = new Blob([csv], { type: "text/csv" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `trip-${trip.id}-gps.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+  toast.success("GPS CSV downloaded");
+}
+
+function exportSingleJSON(trip: Trip) {
+  const blob = new Blob([JSON.stringify(trip, null, 2)], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `trip-${trip.id}.json`;
+  a.click();
+  URL.revokeObjectURL(url);
+  toast.success("JSON downloaded");
+}
+
+function exportSingleGeoJSON(trip: Trip) {
+  const features: any[] = [];
+  trip.stops.forEach((stop) => {
+    if (stop.lat !== null && stop.lng !== null) {
+      features.push({
+        type: "Feature",
+        geometry: {
+          type: "Point",
+          coordinates: [stop.lng, stop.lat],
+        },
+        properties: {
+          tripId: trip.id,
+          origin: trip.origin,
+          destination: trip.destination,
+          fare: trip.fare,
+          startedAt: new Date(trip.startedAt).toISOString(),
+          endedAt: trip.endedAt ? new Date(trip.endedAt).toISOString() : null,
+          stopType: stop.type,
+          boarding: stop.boarding,
+          alighting: stop.alighting,
+          dwellSeconds: stop.dwellSeconds,
+          notes: stop.notes || "",
+          stopTimestamp: new Date(stop.ts).toISOString(),
+        },
+      });
+    }
+  });
+  const geojson = { type: "FeatureCollection", features };
+  const blob = new Blob([JSON.stringify(geojson, null, 2)], { type: "application/geo+json" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `trip-${trip.id}.geojson`;
+  a.click();
+  URL.revokeObjectURL(url);
+  toast.success("GeoJSON downloaded");
+}
+
+// ========== BULK GEOJSON EXPORT (Shapefile alternative) ==========
+function exportGeoJSON(trips: Trip[]) {
+  const features: any[] = [];
+  trips.forEach((trip) => {
+    trip.stops.forEach((stop) => {
+      if (stop.lat !== null && stop.lng !== null) {
+        features.push({
+          type: "Feature",
+          geometry: {
+            type: "Point",
+            coordinates: [stop.lng, stop.lat],
+          },
+          properties: {
+            tripId: trip.id,
+            origin: trip.origin,
+            destination: trip.destination,
+            fare: trip.fare,
+            startedAt: new Date(trip.startedAt).toISOString(),
+            endedAt: trip.endedAt ? new Date(trip.endedAt).toISOString() : null,
+            stopType: stop.type,
+            boarding: stop.boarding,
+            alighting: stop.alighting,
+            dwellSeconds: stop.dwellSeconds,
+            notes: stop.notes || "",
+            stopTimestamp: new Date(stop.ts).toISOString(),
+          },
+        });
+      }
+    });
+  });
+  const geojson = {
+    type: "FeatureCollection",
+    features,
+  };
+  const blob = new Blob([JSON.stringify(geojson, null, 2)], { type: "application/geo+json" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `transit-stops-${Date.now()}.geojson`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  toast.success("GeoJSON exported");
 }
 
 function App() {
@@ -122,14 +285,13 @@ function App() {
   const startTrip = (data: {
     origin: string;
     destination: string;
-    fare: number;
     initialPassengers: number;
   }) => {
     const trip: Trip = {
       id: uid(),
       origin: data.origin,
       destination: data.destination,
-      fare: data.fare,
+      fare: 0,
       initialPassengers: data.initialPassengers,
       startedAt: Date.now(),
       distanceMeters: 0,
@@ -153,7 +315,7 @@ function App() {
     toast.success("Stop logged");
   };
 
-  const endTrip = (stop: Omit<Stop, "id" | "ts" | "lat" | "lng">) => {
+  const endTrip = (stop: Omit<Stop, "id" | "ts" | "lat" | "lng">, fare?: number) => {
     if (!active) return;
     const s: Stop = {
       ...stop,
@@ -167,6 +329,7 @@ function App() {
       stops: [...active.stops, s],
       endedAt: Date.now(),
       endStopId: s.id,
+      fare: fare ?? active.fare,
     };
     const next = [ended, ...trips];
     setTrips(next);
@@ -179,10 +342,10 @@ function App() {
     const next = trips.filter((t) => t.id !== id);
     setTrips(next);
     saveTrips(next);
+    toast.success("Trip deleted");
   };
 
   const uploadAll = async () => {
-    // Front-end only: simulated upload + mark as uploaded.
     if (!online) {
       toast.error("You're offline — try again when connected");
       return;
@@ -208,6 +371,22 @@ function App() {
     a.download = `transit-trips-${Date.now()}.json`;
     a.click();
     URL.revokeObjectURL(url);
+    toast.success("JSON exported");
+  };
+
+  const exportTripCsv = () => {
+    exportTripSummaryCSV(trips);
+    toast.success("Trips CSV exported");
+  };
+
+  const exportStopsCsv = () => {
+    exportStopsCSV(trips);
+    toast.success("Stops CSV exported");
+  };
+
+  const exportGpsCsv = () => {
+    exportGPSCSV(trips);
+    toast.success("GPS CSV exported");
   };
 
   return (
@@ -262,13 +441,34 @@ function App() {
               <NewTripForm onStart={startTrip} />
             </TabsContent>
             <TabsContent value="history" className="mt-4 space-y-3">
-              <div className="flex gap-2">
+              <div className="flex gap-2 flex-wrap">
                 <Button onClick={uploadAll} className="flex-1 gap-2">
                   <Upload className="h-4 w-4" /> Upload to web
                 </Button>
-                <Button variant="outline" onClick={exportJson} className="gap-2">
-                  <Download className="h-4 w-4" /> JSON
-                </Button>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="outline" className="gap-2">
+                      <Download className="h-4 w-4" /> Download
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem onClick={exportTripCsv}>
+                      CSV (Trips)
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={exportStopsCsv}>
+                      CSV (Stops)
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={exportGpsCsv}>
+                      CSV (GPS)
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={exportJson}>
+                      JSON
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => exportGeoJSON(trips)}>
+                      Shapefile (GeoJSON)
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
               </div>
               {trips.length === 0 && (
                 <Card className="p-8 text-center text-sm text-muted-foreground">
@@ -286,14 +486,14 @@ function App() {
   );
 }
 
+// ========== NEW TRIP FORM (no fare) ==========
 function NewTripForm({
   onStart,
 }: {
-  onStart: (d: { origin: string; destination: string; fare: number; initialPassengers: number }) => void;
+  onStart: (d: { origin: string; destination: string; initialPassengers: number }) => void;
 }) {
   const [origin, setOrigin] = useState("");
   const [destination, setDestination] = useState("");
-  const [fare, setFare] = useState("");
   const [pax, setPax] = useState("");
 
   const submit = (e: React.FormEvent) => {
@@ -305,7 +505,6 @@ function NewTripForm({
     onStart({
       origin: origin.trim().slice(0, 80),
       destination: destination.trim().slice(0, 80),
-      fare: Number(fare) || 0,
       initialPassengers: Math.max(0, parseInt(pax) || 0),
     });
   };
@@ -321,15 +520,9 @@ function NewTripForm({
           <Label>Destination</Label>
           <Input value={destination} onChange={(e) => setDestination(e.target.value)} maxLength={80} placeholder="e.g. Airport" />
         </div>
-        <div className="grid grid-cols-2 gap-3">
-          <div className="space-y-2">
-            <Label>Fare</Label>
-            <Input inputMode="decimal" value={fare} onChange={(e) => setFare(e.target.value)} placeholder="0.00" />
-          </div>
-          <div className="space-y-2">
-            <Label>Passengers @ start</Label>
-            <Input inputMode="numeric" value={pax} onChange={(e) => setPax(e.target.value)} placeholder="0" />
-          </div>
+        <div className="space-y-2">
+          <Label>Passengers @ start</Label>
+          <Input inputMode="numeric" value={pax} onChange={(e) => setPax(e.target.value)} placeholder="0" />
         </div>
         <Button type="submit" size="lg" className="w-full gap-2 bg-gradient-hero">
           <Navigation className="h-4 w-4" /> Start trip & GPS
@@ -342,6 +535,7 @@ function NewTripForm({
   );
 }
 
+// ========== ACTIVE TRIP VIEW (stop timeline removed) ==========
 function ActiveTripView({
   trip,
   now,
@@ -351,7 +545,7 @@ function ActiveTripView({
   trip: Trip;
   now: number;
   onAddStop: (s: Omit<Stop, "id" | "ts" | "lat" | "lng">) => void;
-  onEnd: (s: Omit<Stop, "id" | "ts" | "lat" | "lng">) => void;
+  onEnd: (s: Omit<Stop, "id" | "ts" | "lat" | "lng">, fare: number) => void;
 }) {
   const [stopOpen, setStopOpen] = useState(false);
   const [endOpen, setEndOpen] = useState(false);
@@ -438,65 +632,7 @@ function ActiveTripView({
         </Button>
       </div>
 
-      <Card className="p-4">
-        <h3 className="mb-3 text-sm font-semibold">Stops timeline</h3>
-        {trip.stops.length === 0 ? (
-          <p className="text-xs text-muted-foreground">No stops logged yet.</p>
-        ) : (
-          <ol className="space-y-3">
-            {trip.stops.map((s, i) => (
-              <li key={s.id} className="flex gap-3">
-                <div className="flex flex-col items-center">
-                  <div
-                    className={`flex h-8 w-8 items-center justify-center rounded-full text-xs font-semibold ${
-                      s.type === "signalized"
-                        ? "bg-signal text-signal-foreground"
-                        : "bg-secondary text-secondary-foreground"
-                    }`}
-                  >
-                    {i + 1}
-                  </div>
-                  {i < trip.stops.length - 1 && <div className="my-1 w-px flex-1 bg-border" />}
-                </div>
-                <div className="flex-1 pb-1">
-                  <div className="flex flex-wrap items-center gap-2">
-                    {s.type === "signalized" ? (
-                      <Badge className="gap-1 bg-signal text-signal-foreground hover:bg-signal">
-                        <TrafficCone className="h-3 w-3" /> Signal · {s.signalDelay}
-                      </Badge>
-                    ) : (
-                      <Badge variant="secondary" className="gap-1">
-                        <MapPin className="h-3 w-3" /> Stop
-                      </Badge>
-                    )}
-                    {s.dwellSeconds != null && (
-                      <Badge variant="outline" className="font-mono text-[10px]">
-                        dwell {s.dwellSeconds}s
-                      </Badge>
-                    )}
-                    <span className="font-mono text-[11px] text-muted-foreground">
-                      {new Date(s.ts).toLocaleTimeString()}
-                    </span>
-                  </div>
-                  {s.intersectionName && (
-                    <div className="mt-1 text-xs font-medium">{s.intersectionName}</div>
-                  )}
-                  <div className="mt-1 text-sm">
-                    <span className="font-mono">+{s.boarding}</span> board ·{" "}
-                    <span className="font-mono">-{s.alighting}</span> alight
-                  </div>
-                  {s.notes && <p className="mt-1 text-xs text-muted-foreground">"{s.notes}"</p>}
-                  {s.lat != null && (
-                    <p className="mt-1 font-mono text-[10px] text-muted-foreground">
-                      {s.lat.toFixed(5)}, {s.lng?.toFixed(5)}
-                    </p>
-                  )}
-                </div>
-              </li>
-            ))}
-          </ol>
-        )}
-      </Card>
+      {/* Stops timeline removed – stops are still saved in background */}
 
       <StopDialog
         open={stopOpen}
@@ -514,8 +650,8 @@ function ActiveTripView({
         title="End trip at stop"
         submitLabel="End trip"
         destructive
-        onSubmit={(d) => {
-          onEnd(d);
+        onSubmit={(d, fare) => {
+          onEnd(d, fare);
           setEndOpen(false);
         }}
       />
@@ -523,6 +659,7 @@ function ActiveTripView({
   );
 }
 
+// ========== STOP DIALOG (regular stops only, fare on end) ==========
 function StopDialog({
   open,
   onOpenChange,
@@ -536,28 +673,24 @@ function StopDialog({
   title: string;
   submitLabel: string;
   destructive?: boolean;
-  onSubmit: (s: Omit<Stop, "id" | "ts" | "lat" | "lng">) => void;
+  onSubmit: (s: Omit<Stop, "id" | "ts" | "lat" | "lng">, fare?: number) => void;
 }) {
-  const [type, setType] = useState<"regular" | "signalized">("regular");
-  const [delay, setDelay] = useState<SignalDelay>("none");
   const [board, setBoard] = useState("0");
   const [alight, setAlight] = useState("0");
   const [notes, setNotes] = useState("");
-  const [intersection, setIntersection] = useState("");
   const [dwellStart, setDwellStart] = useState<number | null>(null);
   const [dwellPaused, setDwellPaused] = useState<number>(0);
   const [tick, setTick] = useState(0);
+  const [fare, setFare] = useState("");
 
   useEffect(() => {
     if (open) {
-      setType("regular");
-      setDelay("none");
       setBoard("0");
       setAlight("0");
       setNotes("");
-      setIntersection("");
       setDwellStart(Date.now());
       setDwellPaused(0);
+      setFare("");
     }
   }, [open]);
 
@@ -569,7 +702,6 @@ function StopDialog({
 
   const dwellMs = dwellStart === null ? dwellPaused : dwellPaused + (Date.now() - dwellStart);
   const dwellSec = Math.round(dwellMs / 1000);
-  // reference tick to satisfy linter
   void tick;
 
   return (
@@ -579,29 +711,6 @@ function StopDialog({
           <DialogTitle>{title}</DialogTitle>
         </DialogHeader>
         <div className="space-y-4">
-          <div className="grid grid-cols-2 gap-2">
-            <button
-              type="button"
-              onClick={() => setType("regular")}
-              className={`rounded-lg border p-3 text-left transition ${
-                type === "regular" ? "border-primary bg-secondary" : "hover:bg-secondary/50"
-              }`}
-            >
-              <MapPin className="mb-1 h-4 w-4" />
-              <div className="text-sm font-medium">Regular stop</div>
-            </button>
-            <button
-              type="button"
-              onClick={() => setType("signalized")}
-              className={`rounded-lg border p-3 text-left transition ${
-                type === "signalized" ? "border-primary bg-secondary" : "hover:bg-secondary/50"
-              }`}
-            >
-              <TrafficCone className="mb-1 h-4 w-4" />
-              <div className="text-sm font-medium">Signal intersection</div>
-            </button>
-          </div>
-
           <div className="rounded-lg border bg-secondary/40 p-3">
             <div className="flex items-center justify-between">
               <div>
@@ -633,40 +742,6 @@ function StopDialog({
             </p>
           </div>
 
-          {type === "signalized" && (
-            <>
-              <div className="space-y-2">
-                <Label>Signalized intersection (area / name)</Label>
-                <Input
-                  value={intersection}
-                  onChange={(e) => setIntersection(e.target.value)}
-                  maxLength={120}
-                  placeholder="e.g. 5th Ave & Main St"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>Signal delay</Label>
-                <RadioGroup
-                  value={delay}
-                  onValueChange={(v) => setDelay(v as SignalDelay)}
-                  className="grid grid-cols-3 gap-2"
-                >
-                  {(["none", "short", "long"] as const).map((v) => (
-                    <Label
-                      key={v}
-                      className={`flex cursor-pointer items-center justify-center gap-2 rounded-lg border p-2 text-xs capitalize ${
-                        delay === v ? "border-primary bg-secondary" : ""
-                      }`}
-                    >
-                      <RadioGroupItem value={v} className="sr-only" />
-                      {v}
-                    </Label>
-                  ))}
-                </RadioGroup>
-              </div>
-            </>
-          )}
-
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-2">
               <Label>Boarding</Label>
@@ -688,6 +763,18 @@ function StopDialog({
               rows={3}
             />
           </div>
+
+          {destructive && (
+            <div className="space-y-2">
+              <Label>Total fare (₦)</Label>
+              <Input
+                inputMode="decimal"
+                value={fare}
+                onChange={(e) => setFare(e.target.value)}
+                placeholder="0.00"
+              />
+            </div>
+          )}
         </div>
         <DialogFooter>
           <Button variant="ghost" onClick={() => onOpenChange(false)}>
@@ -696,18 +783,16 @@ function StopDialog({
           <Button
             variant={destructive ? "destructive" : "default"}
             onClick={() =>
-              onSubmit({
-                type,
-                signalDelay: type === "signalized" ? delay : undefined,
-                intersectionName:
-                  type === "signalized" && intersection.trim()
-                    ? intersection.trim()
-                    : undefined,
-                dwellSeconds: dwellSec,
-                boarding: Math.max(0, parseInt(board) || 0),
-                alighting: Math.max(0, parseInt(alight) || 0),
-                notes: notes.trim() || undefined,
-              })
+              onSubmit(
+                {
+                  type: "regular",
+                  dwellSeconds: dwellSec,
+                  boarding: Math.max(0, parseInt(board) || 0),
+                  alighting: Math.max(0, parseInt(alight) || 0),
+                  notes: notes.trim() || undefined,
+                },
+                destructive ? (parseFloat(fare) || 0) : undefined
+              )
             }
           >
             {submitLabel}
@@ -718,9 +803,9 @@ function StopDialog({
   );
 }
 
+// ========== TRIP CARD (with its own download dropdown) ==========
 function TripCard({ trip, onDelete }: { trip: Trip; onDelete: () => void }) {
   const dur = (trip.endedAt ?? trip.startedAt) - trip.startedAt;
-  const signalStops = trip.stops.filter((s) => s.type === "signalized").length;
   return (
     <Card className="p-4 shadow-card">
       <div className="flex items-start justify-between gap-3">
@@ -738,11 +823,37 @@ function TripCard({ trip, onDelete }: { trip: Trip; onDelete: () => void }) {
             {new Date(trip.startedAt).toLocaleString()}
           </div>
         </div>
-        <Button size="icon" variant="ghost" onClick={onDelete}>
-          <Trash2 className="h-4 w-4" />
-        </Button>
+        <div className="flex gap-1">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button size="icon" variant="ghost">
+                <Download className="h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={() => exportSingleTripCSV(trip)}>
+                CSV (Trip)
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => exportSingleStopsCSV(trip)}>
+                CSV (Stops)
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => exportSingleGPSCSV(trip)}>
+                CSV (GPS)
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => exportSingleJSON(trip)}>
+                JSON
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => exportSingleGeoJSON(trip)}>
+                Shapefile (GeoJSON)
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+          <Button size="icon" variant="ghost" onClick={onDelete}>
+            <Trash2 className="h-4 w-4" />
+          </Button>
+        </div>
       </div>
-      <div className="mt-3 grid grid-cols-4 gap-2 text-center">
+      <div className="mt-3 grid grid-cols-3 gap-2 text-center">
         <div>
           <div className="font-mono text-sm font-semibold">{fmtDuration(dur)}</div>
           <div className="text-[10px] text-muted-foreground">time</div>
@@ -754,10 +865,6 @@ function TripCard({ trip, onDelete }: { trip: Trip; onDelete: () => void }) {
         <div>
           <div className="font-mono text-sm font-semibold">{trip.stops.length}</div>
           <div className="text-[10px] text-muted-foreground">stops</div>
-        </div>
-        <div>
-          <div className="font-mono text-sm font-semibold">{signalStops}</div>
-          <div className="text-[10px] text-muted-foreground">signals</div>
         </div>
       </div>
     </Card>
