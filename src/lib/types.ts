@@ -1,4 +1,5 @@
 export type GpsPoint = {
+  record_type: "gps_point";
   ts: number;
   lat: number;
   lng: number;

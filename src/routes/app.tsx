@@ -1,12 +1,12 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { requireAuth } from "@/lib/auth-guard";
 import {
   ApiError,
   getMe,
   loadToken,
   saveToken,
-  uploadTrip,
+  uploadTrips,
   type User,
 } from "@/lib/api";
 import { Button } from "@/components/ui/button";
@@ -36,19 +36,16 @@ import {
   Wifi,
   WifiOff,
   LogOut,
+  Database,
   ArrowDownToLine,
   ArrowUpFromLine,
 } from "lucide-react";
 import { useGps } from "@/hooks/use-gps";
-import {
-  haversine,
-  loadActive,
-  loadTrips,
-  saveActive,
-  saveTrips,
-} from "@/lib/storage";
+import { loadActive, loadTrips, saveActive, saveTrips } from "@/lib/storage";
+import { appendGpsPoint, GPS_SAMPLE_INTERVAL_MS } from "@/lib/tripGps";
 import type { Stop, Trip } from "@/lib/types";
 import { TripStatBadge } from "@/components/TripStatBadge";
+import { MyDataSheet } from "@/components/MyDataSheet";
 
 export const Route = createFileRoute("/app")({
   beforeLoad: requireAuth,
@@ -79,6 +76,7 @@ function App() {
   );
   const [user, setUser] = useState<User | null>(null);
   const [uploading, setUploading] = useState(false);
+  const [myDataOpen, setMyDataOpen] = useState(false);
 
   useEffect(() => {
     if (!loadToken()) {
@@ -99,6 +97,11 @@ function App() {
   }, [navigate]);
 
   const signOut = () => {
+    saveToken(null);
+    navigate({ to: "/" });
+  };
+
+  const handleSessionExpired = () => {
     saveToken(null);
     navigate({ to: "/" });
   };
@@ -127,25 +130,25 @@ function App() {
     saveActive(active);
   }, [active]);
 
-  const handleGps = (p: { ts: number; lat: number; lng: number }) => {
-    setActive((prev) => {
-      if (!prev) return prev;
-      const last = prev.gps[prev.gps.length - 1];
-      const minGap = 1000;
-      if (last && p.ts - last.ts < minGap) return prev;
-      const added =
-        last && p.ts - last.ts > 0
-          ? haversine(last, p)
-          : 0;
-      return {
-        ...prev,
-        gps: [...prev.gps, p],
-        distanceMeters: prev.distanceMeters + added,
-      };
-    });
-  };
+  const gpsActive = !!active && !active.endedAt;
+  const { status: gpsStatus, last: lastPoint } = useGps(gpsActive);
+  const lastFixRef = useRef(lastPoint);
+  lastFixRef.current = lastPoint;
 
-  const { status: gpsStatus, last: lastPoint } = useGps(!!active && !active.endedAt, handleGps);
+  // Sample current position every 3s into trip.gps with record_type gps_point
+  useEffect(() => {
+    if (!gpsActive) return;
+
+    const sample = () => {
+      const fix = lastFixRef.current;
+      if (!fix) return;
+      setActive((prev) => (prev ? appendGpsPoint(prev, fix) : prev));
+    };
+
+    sample();
+    const t = setInterval(sample, GPS_SAMPLE_INTERVAL_MS);
+    return () => clearInterval(t);
+  }, [gpsActive, active?.id]);
 
   const startTrip = (data: {
     origin: string;
@@ -167,14 +170,25 @@ function App() {
     toast.success("Trip started — GPS tracking on");
   };
 
+  const stopCoords = () => {
+    if (lastPoint) return { lat: lastPoint.lat, lng: lastPoint.lng };
+    const last = active?.gps[active.gps.length - 1];
+    if (last) return { lat: last.lat, lng: last.lng };
+    return { lat: null, lng: null };
+  };
+
   const addStop = (stop: Omit<Stop, "id" | "ts" | "lat" | "lng">) => {
     if (!active) return;
+    const { lat, lng } = stopCoords();
+    if (lat == null || lng == null) {
+      toast.warning("GPS not ready — stop saved; coordinates will fill in when GPS is available");
+    }
     const s: Stop = {
       ...stop,
       id: uid(),
       ts: Date.now(),
-      lat: lastPoint?.lat ?? null,
-      lng: lastPoint?.lng ?? null,
+      lat,
+      lng,
     };
     setActive({ ...active, stops: [...active.stops, s] });
     toast.success("Stop logged");
@@ -182,12 +196,16 @@ function App() {
 
   const endTrip = (stop: Omit<Stop, "id" | "ts" | "lat" | "lng">, fare?: number) => {
     if (!active) return;
+    const { lat, lng } = stopCoords();
+    if (lat == null || lng == null) {
+      toast.warning("GPS not ready — trip saved; coordinates will fill in when GPS is available");
+    }
     const s: Stop = {
       ...stop,
       id: uid(),
       ts: Date.now(),
-      lat: lastPoint?.lat ?? null,
-      lng: lastPoint?.lng ?? null,
+      lat,
+      lng,
     };
     const ended: Trip = {
       ...active,
@@ -227,37 +245,32 @@ function App() {
     }
     setUploading(true);
     toast.loading(`Uploading ${pending.length} trip(s)...`, { id: "up" });
-    const uploadedIds = new Set<string>();
     try {
-      for (const trip of pending) {
-        try {
-          await uploadTrip(trip, token);
-          uploadedIds.add(trip.id);
-        } catch (err) {
-          if (err instanceof ApiError && err.status === 401) {
-            saveToken(null);
-            navigate({ to: "/" });
-            toast.error("Session expired — sign in again", { id: "up" });
-            return;
-          }
-          const msg = err instanceof Error ? err.message : "Upload failed";
-          if (uploadedIds.size > 0) {
-            const next = trips.map((t) =>
-              uploadedIds.has(t.id) ? { ...t, uploaded: true } : t,
-            );
-            setTrips(next);
-            saveTrips(next);
-          }
-          toast.error(msg, { id: "up" });
-          return;
-        }
-      }
-      const next = trips.map((t) =>
-        uploadedIds.has(t.id) ? { ...t, uploaded: true } : t,
-      );
+      const { repaired, skippedStops, filled } = await uploadTrips(pending, token);
+      const repairedById = new Map(repaired.map((t) => [t.id, t]));
+      const pendingIds = new Set(pending.map((t) => t.id));
+      const next = trips.map((t) => {
+        if (!pendingIds.has(t.id)) return t;
+        const saved = repairedById.get(t.id) ?? t;
+        return { ...saved, uploaded: true };
+      });
       setTrips(next);
       saveTrips(next);
-      toast.success(`Uploaded ${uploadedIds.size} trip(s)`, { id: "up" });
+      let msg = `Uploaded ${pending.length} trip(s)`;
+      if (filled > 0) msg += ` · ${filled} stop(s) filled from GPS track`;
+      if (skippedStops > 0) {
+        msg += ` · ${skippedStops} stop(s) skipped (no GPS)`;
+      }
+      toast.success(msg, { id: "up" });
+    } catch (err) {
+      if (err instanceof ApiError && err.status === 401) {
+        saveToken(null);
+        navigate({ to: "/" });
+        toast.error("Session expired — sign in again", { id: "up" });
+        return;
+      }
+      const msg = err instanceof Error ? err.message : "Upload failed";
+      toast.error(msg, { id: "up" });
     } finally {
       setUploading(false);
     }
@@ -296,6 +309,16 @@ function App() {
               variant="ghost"
               size="sm"
               className="gap-1 text-xs"
+              onClick={() => setMyDataOpen(true)}
+            >
+              <Database className="h-3.5 w-3.5" />
+              My data
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="gap-1 text-xs"
               onClick={signOut}
             >
               <LogOut className="h-3.5 w-3.5" />
@@ -304,6 +327,13 @@ function App() {
           </div>
         </div>
       </header>
+
+      <MyDataSheet
+        open={myDataOpen}
+        onOpenChange={setMyDataOpen}
+        online={online}
+        onSessionExpired={handleSessionExpired}
+      />
 
       <main className="mx-auto max-w-3xl px-4 pb-24 pt-6">
         {active ? (
@@ -395,7 +425,7 @@ function NewTripForm({
           <Navigation className="h-4 w-4" /> Start trip & GPS
         </Button>
         <p className="text-center text-xs text-muted-foreground">
-          GPS records every 1–3 sec. Works offline; data saved to phone.
+          GPS records every 3 sec. Works offline; data saved to phone.
         </p>
       </form>
     </Card>
