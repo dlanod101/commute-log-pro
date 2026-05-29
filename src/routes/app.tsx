@@ -41,6 +41,7 @@ import {
   ArrowUpFromLine,
 } from "lucide-react";
 import { useGps } from "@/hooks/use-gps";
+import { useOnline } from "@/hooks/use-online";
 import { loadActive, loadTrips, saveActive, saveTrips } from "@/lib/storage";
 import { appendGpsPoint, GPS_SAMPLE_INTERVAL_MS } from "@/lib/tripGps";
 import type { Stop, Trip } from "@/lib/types";
@@ -71,9 +72,7 @@ function App() {
   const [active, setActive] = useState<Trip | null>(null);
   const [trips, setTrips] = useState<Trip[]>([]);
   const [now, setNow] = useState(Date.now());
-  const [online, setOnline] = useState(
-    typeof navigator !== "undefined" ? navigator.onLine : true,
-  );
+  const online = useOnline();
   const [user, setUser] = useState<User | null>(null);
   const [uploading, setUploading] = useState(false);
   const [myDataOpen, setMyDataOpen] = useState(false);
@@ -89,9 +88,11 @@ function App() {
     if (token) {
       getMe(token)
         .then(setUser)
-        .catch(() => {
-          saveToken(null);
-          navigate({ to: "/" });
+        .catch((err) => {
+          if (err instanceof ApiError && err.status === 401) {
+            saveToken(null);
+            navigate({ to: "/" });
+          }
         });
     }
   }, [navigate]);
@@ -112,18 +113,6 @@ function App() {
     const t = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(t);
   }, [active]);
-
-  // online/offline
-  useEffect(() => {
-    const on = () => setOnline(true);
-    const off = () => setOnline(false);
-    window.addEventListener("online", on);
-    window.addEventListener("offline", off);
-    return () => {
-      window.removeEventListener("online", on);
-      window.removeEventListener("offline", off);
-    };
-  }, []);
 
   // persist active
   useEffect(() => {
@@ -309,7 +298,15 @@ function App() {
               variant="ghost"
               size="sm"
               className="gap-1 text-xs"
-              onClick={() => setMyDataOpen(true)}
+              disabled={!online}
+              title={online ? undefined : "Requires internet connection"}
+              onClick={() => {
+                if (!online) {
+                  toast.error("My data requires an internet connection");
+                  return;
+                }
+                setMyDataOpen(true);
+              }}
             >
               <Database className="h-3.5 w-3.5" />
               My data
@@ -360,10 +357,16 @@ function App() {
                   Signed in as {user.name || user.email} · Unit {user.unit_id}
                 </p>
               )}
+              {!online && (
+                <p className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-center text-xs text-amber-800 dark:text-amber-200">
+                  Upload and server downloads need internet. Trip recording works offline.
+                </p>
+              )}
               <Button
                 onClick={uploadAll}
                 className="w-full gap-2"
-                disabled={uploading}
+                disabled={uploading || !online}
+                title={online ? undefined : "Requires internet connection"}
               >
                 <Upload className="h-4 w-4" /> Upload to web
               </Button>
@@ -425,7 +428,7 @@ function NewTripForm({
           <Navigation className="h-4 w-4" /> Start trip & GPS
         </Button>
         <p className="text-center text-xs text-muted-foreground">
-          GPS records every 3 sec. Works offline; data saved to phone.
+          GPS records every 3 sec. Trips save on this device; upload when online.
         </p>
       </form>
     </Card>

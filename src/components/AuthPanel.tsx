@@ -24,7 +24,11 @@ export function AuthPanel() {
   const goToApp = async (email: string, password: string) => {
     const token = await login(email, password);
     saveToken(token.access_token);
-    await getMe(token.access_token);
+    try {
+      await getMe(token.access_token);
+    } catch {
+      /* Token is valid; /app will load profile when online */
+    }
     navigate({ to: "/app" });
   };
 
