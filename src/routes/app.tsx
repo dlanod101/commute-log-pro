@@ -268,21 +268,25 @@ function App() {
   return (
     <div className="min-h-screen bg-background">
       <Toaster richColors position="top-center" />
-      <header className="sticky top-0 z-20 border-b bg-background/80 backdrop-blur">
-        <div className="mx-auto flex max-w-3xl items-center justify-between px-4 py-3">
-          <div className="flex items-center gap-2">
-            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-gradient-hero text-primary-foreground shadow-elevated">
+      <header className="sticky top-0 z-20 border-b bg-background/80 pt-safe backdrop-blur">
+        <div className="mx-auto flex max-w-3xl flex-col gap-2 px-3 py-2.5 sm:flex-row sm:items-center sm:justify-between sm:px-4 sm:py-3">
+          <div className="flex min-w-0 items-center gap-2">
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-gradient-hero text-primary-foreground shadow-elevated">
               <Bus className="h-5 w-5" />
             </div>
-            <div>
-              <h1 className="text-base font-semibold leading-none">T-data fetcher</h1>
-              <p className="text-[11px] text-muted-foreground">Transit field data collection</p>
+            <div className="min-w-0">
+              <h1 className="truncate text-sm font-semibold leading-none sm:text-base">
+                T-data fetcher
+              </h1>
+              <p className="hidden text-[11px] text-muted-foreground sm:block">
+                Transit field data collection
+              </p>
             </div>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-1.5 sm:justify-end">
             <Badge variant="outline" className="gap-1 font-mono text-[10px]">
-              {online ? <Wifi className="h-3 w-3" /> : <WifiOff className="h-3 w-3" />}
-              {online ? "ONLINE" : "OFFLINE"}
+              {online ? <Wifi className="h-3 w-3 shrink-0" /> : <WifiOff className="h-3 w-3 shrink-0" />}
+              <span className="hidden min-[360px]:inline">{online ? "ONLINE" : "OFFLINE"}</span>
             </Badge>
             <Badge
               variant="outline"
@@ -290,14 +294,33 @@ function App() {
                 gpsStatus === "active" ? "border-success text-success" : ""
               }`}
             >
-              <Navigation className="h-3 w-3" />
-              GPS {gpsStatus.toUpperCase()}
+              <Navigation className="h-3 w-3 shrink-0" />
+              <span className="hidden min-[400px]:inline">GPS </span>
+              {gpsStatus.toUpperCase()}
             </Badge>
             <Button
               type="button"
               variant="ghost"
+              size="icon"
+              className="h-8 w-8 sm:hidden"
+              disabled={!online}
+              aria-label="My data"
+              title={online ? "My data" : "Requires internet connection"}
+              onClick={() => {
+                if (!online) {
+                  toast.error("My data requires an internet connection");
+                  return;
+                }
+                setMyDataOpen(true);
+              }}
+            >
+              <Database className="h-4 w-4" />
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
               size="sm"
-              className="gap-1 text-xs"
+              className="hidden gap-1 text-xs sm:inline-flex"
               disabled={!online}
               title={online ? undefined : "Requires internet connection"}
               onClick={() => {
@@ -314,8 +337,18 @@ function App() {
             <Button
               type="button"
               variant="ghost"
+              size="icon"
+              className="h-8 w-8 sm:hidden"
+              aria-label="Sign out"
+              onClick={signOut}
+            >
+              <LogOut className="h-4 w-4" />
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
               size="sm"
-              className="gap-1 text-xs"
+              className="hidden gap-1 text-xs sm:inline-flex"
               onClick={signOut}
             >
               <LogOut className="h-3.5 w-3.5" />
@@ -332,7 +365,7 @@ function App() {
         onSessionExpired={handleSessionExpired}
       />
 
-      <main className="mx-auto max-w-3xl px-4 pb-24 pt-6">
+      <main className="mx-auto max-w-3xl px-3 pb-28 pt-4 sm:px-4 sm:pb-24 sm:pt-6">
         {active ? (
           <ActiveTripView
             trip={active}
@@ -353,7 +386,7 @@ function App() {
             </TabsContent>
             <TabsContent value="history" className="mt-4 space-y-3">
               {user && (
-                <p className="text-center text-xs text-muted-foreground">
+                <p className="break-words px-1 text-center text-xs text-muted-foreground">
                   Signed in as {user.name || user.email} · Unit {user.unit_id}
                 </p>
               )}
@@ -410,7 +443,7 @@ function NewTripForm({
   };
 
   return (
-    <Card className="p-5 shadow-card">
+    <Card className="p-4 shadow-card sm:p-5">
       <form onSubmit={submit} className="space-y-4">
         <div className="space-y-2">
           <Label>Origin</Label>
@@ -465,16 +498,19 @@ function ActiveTripView({
 
   return (
     <div className="space-y-4">
-      <Card className="overflow-hidden border-0 bg-gradient-hero p-5 text-primary-foreground shadow-elevated">
+      <Card className="overflow-hidden border-0 bg-gradient-hero p-4 text-primary-foreground shadow-elevated sm:p-5">
         <div className="flex items-center gap-2 text-xs uppercase tracking-widest opacity-80">
           <span className="inline-block h-2 w-2 animate-pulse rounded-full bg-accent" />
           Trip in progress
         </div>
-        <div className="mt-2 font-mono text-xs opacity-80">ID · {trip.id}</div>
-        <div className="mt-3 flex items-center gap-2 text-lg font-semibold">
+        <div className="mt-2 font-mono text-[10px] opacity-80 sm:text-xs">ID · {trip.id}</div>
+        <div className="mt-3 flex flex-col gap-0.5 text-base font-semibold sm:flex-row sm:items-center sm:gap-2 sm:text-lg">
           <span className="truncate">{trip.origin}</span>
-          <span className="opacity-50">→</span>
-          <span className="truncate">{trip.destination}</span>
+          <span className="hidden opacity-50 sm:inline">→</span>
+          <span className="truncate sm:before:content-none">
+            <span className="opacity-50 sm:hidden">→ </span>
+            {trip.destination}
+          </span>
         </div>
       </Card>
 
@@ -492,43 +528,53 @@ function ActiveTripView({
             start: {trip.initialPassengers}
           </span>
         </div>
-        <div className="grid grid-cols-3 gap-2">
-          <div className="rounded-xl border bg-success/10 p-3 text-center">
-            <div className="flex items-center justify-center gap-1 text-[10px] uppercase tracking-widest text-success">
-              <ArrowDownToLine className="h-3 w-3" /> Boarded
+        <div className="grid grid-cols-3 gap-1.5 sm:gap-2">
+          <div className="rounded-xl border bg-success/10 p-2 text-center sm:p-3">
+            <div className="flex items-center justify-center gap-0.5 text-[9px] uppercase tracking-widest text-success sm:gap-1 sm:text-[10px]">
+              <ArrowDownToLine className="h-3 w-3 shrink-0" />
+              <span className="truncate">Boarded</span>
             </div>
-            <div className="mt-1 font-mono text-2xl font-semibold tabular-nums text-success">
+            <div className="mt-1 font-mono text-xl font-semibold tabular-nums text-success sm:text-2xl">
               {totalBoard}
             </div>
           </div>
-          <div className="rounded-xl border bg-destructive/10 p-3 text-center">
-            <div className="flex items-center justify-center gap-1 text-[10px] uppercase tracking-widest text-destructive">
-              <ArrowUpFromLine className="h-3 w-3" /> Alighted
+          <div className="rounded-xl border bg-destructive/10 p-2 text-center sm:p-3">
+            <div className="flex items-center justify-center gap-0.5 text-[9px] uppercase tracking-widest text-destructive sm:gap-1 sm:text-[10px]">
+              <ArrowUpFromLine className="h-3 w-3 shrink-0" />
+              <span className="truncate">Alighted</span>
             </div>
-            <div className="mt-1 font-mono text-2xl font-semibold tabular-nums text-destructive">
+            <div className="mt-1 font-mono text-xl font-semibold tabular-nums text-destructive sm:text-2xl">
               {totalAlight}
             </div>
           </div>
-          <div className="rounded-xl border bg-secondary p-3 text-center">
-            <div className="text-[10px] uppercase tracking-widest text-muted-foreground">
+          <div className="rounded-xl border bg-secondary p-2 text-center sm:p-3">
+            <div className="text-[9px] uppercase tracking-widest text-muted-foreground sm:text-[10px]">
               Onboard
             </div>
-            <div className="mt-1 font-mono text-2xl font-semibold tabular-nums">{passengers}</div>
+            <div className="mt-1 font-mono text-xl font-semibold tabular-nums sm:text-2xl">
+              {passengers}
+            </div>
           </div>
         </div>
       </Card>
 
-      <div className="grid grid-cols-2 gap-3">
-        <Button size="lg" onClick={() => setStopOpen(true)} className="h-16 gap-2">
-          <Plus className="h-5 w-5" /> Log stop
+      <div className="grid grid-cols-2 gap-2 sm:gap-3">
+        <Button
+          size="lg"
+          onClick={() => setStopOpen(true)}
+          className="h-auto min-h-14 flex-col gap-1 py-3 text-sm sm:h-16 sm:flex-row sm:gap-2 sm:text-base"
+        >
+          <Plus className="h-5 w-5 shrink-0" />
+          Log stop
         </Button>
         <Button
           size="lg"
           variant="destructive"
           onClick={() => setEndOpen(true)}
-          className="h-16 gap-2"
+          className="h-auto min-h-14 flex-col gap-1 py-3 text-sm sm:h-16 sm:flex-row sm:gap-2 sm:text-base"
         >
-          <Square className="h-5 w-5" /> End trip
+          <Square className="h-5 w-5 shrink-0" />
+          End trip
         </Button>
       </div>
 
@@ -606,24 +652,25 @@ function StopDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-h-[min(90vh,100dvh)] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>{title}</DialogTitle>
         </DialogHeader>
         <div className="space-y-4">
           <div className="rounded-lg border bg-secondary/40 p-3">
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <div className="text-[10px] uppercase tracking-widest text-muted-foreground">
                   Dwell time
                 </div>
-                <div className="font-mono text-2xl font-semibold tabular-nums">
+                <div className="font-mono text-xl font-semibold tabular-nums sm:text-2xl">
                   {fmtDuration(dwellMs)}
                 </div>
               </div>
               <Button
                 type="button"
                 size="sm"
+                className="w-full shrink-0 sm:w-auto"
                 variant={dwellStart === null ? "default" : "outline"}
                 onClick={() => {
                   if (dwellStart === null) {
@@ -706,16 +753,16 @@ function StopDialog({
 function TripCard({ trip, onDelete }: { trip: Trip; onDelete: () => void }) {
   const dur = (trip.endedAt ?? trip.startedAt) - trip.startedAt;
   return (
-    <Card className="p-4 shadow-card">
-      <div className="flex items-start justify-between gap-3">
+    <Card className="p-3 shadow-card sm:p-4">
+      <div className="flex items-start justify-between gap-2 sm:gap-3">
         <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
             <Badge variant={trip.uploaded ? "default" : "outline"} className="text-[10px]">
               {trip.uploaded ? "UPLOADED" : "ON DEVICE"}
             </Badge>
             <span className="font-mono text-[10px] text-muted-foreground">{trip.id}</span>
           </div>
-          <div className="mt-1 truncate text-sm font-semibold">
+          <div className="mt-1 text-sm font-semibold leading-snug sm:truncate">
             {trip.origin} → {trip.destination}
           </div>
           <div className="mt-1 text-[11px] text-muted-foreground">

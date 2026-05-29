@@ -165,4 +165,10 @@
   .shadow-elevated { box-shadow: var(--shadow-elevated); }
   .shadow-card { box-shadow: var(--shadow-card); }
   .font-mono { font-family: var(--font-mono); }
+  .pb-safe {
+    padding-bottom: max(1.5rem, env(safe-area-inset-bottom, 0px));
+  }
+  .pt-safe {
+    padding-top: env(safe-area-inset-top, 0px);
+  }
 }

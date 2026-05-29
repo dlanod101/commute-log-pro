@@ -106,7 +106,7 @@ export function MyDataSheet({
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="right" className="flex w-full flex-col sm:max-w-md">
+      <SheetContent side="right" className="flex w-full flex-col p-4 sm:max-w-md sm:p-6">
         <SheetHeader>
           <SheetTitle className="flex items-center gap-2">
             <Database className="h-5 w-5" />
@@ -160,15 +160,15 @@ export function MyDataSheet({
                 })
               : "";
             return (
-              <Card key={tripId} className="flex items-center justify-between gap-3 p-3">
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-medium">{trip.originDestination}</p>
+              <Card key={tripId} className="flex flex-col gap-3 p-3">
+                <div className="min-w-0">
+                  <p className="text-sm font-medium leading-snug">{trip.originDestination}</p>
                   {when && (
-                    <p className="text-[11px] text-muted-foreground">{when}</p>
+                    <p className="mt-0.5 text-[11px] text-muted-foreground">{when}</p>
                   )}
                   <p className="mt-0.5 font-mono text-[10px] text-muted-foreground">{tripId}</p>
                 </div>
-                <div className="flex shrink-0 flex-col gap-1.5">
+                <div className="grid grid-cols-2 gap-2 sm:flex sm:shrink-0 sm:flex-col sm:gap-1.5">
                   <Button
                     type="button"
                     size="sm"
