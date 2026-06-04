@@ -309,19 +309,50 @@ function App() {
               <span className="hidden min-[400px]:inline">GPS </span>
               {gpsStatus.toUpperCase()}
             </Badge>
+            
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="hidden gap-1 text-xs sm:inline-flex"
+              disabled={!online}
+              title={online ? undefined : "Requires internet connection"}
+              onClick={() => {
+                if (!online) {
+                  toast.error("My data requires an internet connection");
+                  return;
+                }
+                setMyDataOpen(true);
+              }}
+            >
+              <Database className="h-3.5 w-3.5" />
+              My data
+            </Button>
+            
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="hidden gap-1 text-xs sm:inline-flex"
+              onClick={signOut}
+            >
+              <LogOut className="h-3.5 w-3.5" />
+              Sign out
+            </Button>
+
             <Drawer>
               <DrawerTrigger asChild>
                 <Button
                   type="button"
                   variant="ghost"
                   size="icon"
-                  className="h-8 w-8 sm:hidden"
+                  className="h-8 w-8 sm:hidden ml-auto"
                   aria-label="Open menu"
                 >
                   <Menu className="h-5 w-5" />
                 </Button>
               </DrawerTrigger>
-              <DrawerContent>
+              <DrawerContent side="right">
                 <DrawerHeader>
                   <DrawerTitle>Menu</DrawerTitle>
                   <DrawerDescription>Quick actions</DrawerDescription>
@@ -370,35 +401,6 @@ function App() {
                 </DrawerFooter>
               </DrawerContent>
             </Drawer>
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              className="hidden gap-1 text-xs sm:inline-flex"
-              disabled={!online}
-              title={online ? undefined : "Requires internet connection"}
-              onClick={() => {
-                if (!online) {
-                  toast.error("My data requires an internet connection");
-                  return;
-                }
-                setMyDataOpen(true);
-              }}
-            >
-              <Database className="h-3.5 w-3.5" />
-              My data
-            </Button>
-            
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              className="hidden gap-1 text-xs sm:inline-flex"
-              onClick={signOut}
-            >
-              <LogOut className="h-3.5 w-3.5" />
-              Sign out
-            </Button>
           </div>
         </div>
       </header>

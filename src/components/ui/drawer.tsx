@@ -32,22 +32,23 @@ DrawerOverlay.displayName = DrawerPrimitive.Overlay.displayName;
 const DrawerContent = React.forwardRef<
   React.ElementRef<typeof DrawerPrimitive.Content>,
   React.ComponentPropsWithoutRef<typeof DrawerPrimitive.Content>
->(({ className, children, ...props }, ref) => (
-  <DrawerPortal>
-    <DrawerOverlay />
-    <DrawerPrimitive.Content
-      ref={ref}
-      className={cn(
-        "fixed inset-x-0 bottom-0 z-50 mt-24 flex h-auto flex-col rounded-t-[10px] border bg-background",
-        className,
-      )}
-      {...props}
-    >
-      <div className="mx-auto mt-4 h-2 w-[100px] rounded-full bg-muted" />
-      {children}
-    </DrawerPrimitive.Content>
-  </DrawerPortal>
-));
+>(({ className, children, ...props }, ref) => {
+  const contentClass =
+    "fixed inset-x-0 bottom-0 z-50 mt-24 flex h-auto flex-col rounded-t-[10px] border bg-background transform transition-transform duration-300 " +
+    "data-[state=closed]:translate-y-full data-[state=open]:translate-y-0 " +
+    // when Vaul/Radix sets data-side="right", apply right-side positioning and slide-x transforms
+    "data-[side=right]:inset-y-0 data-[side=right]:right-0 data-[side=right]:inset-x-auto data-[side=right]:mt-0 data-[side=right]:h-full data-[side=right]:w-1/2 data-[side=right]:max-w-[480px] data-[side=right]:flex data-[side=right]:flex-col data-[side=right]:rounded-l-[10px] data-[side=right]:border-l " +
+    "data-[side=right]:data-[state=closed]:translate-x-full data-[side=right]:data-[state=open]:translate-x-0";
+
+  return (
+    <DrawerPortal>
+      <DrawerOverlay />
+      <DrawerPrimitive.Content ref={ref} className={cn(contentClass, className)} {...props}>
+        {children}
+      </DrawerPrimitive.Content>
+    </DrawerPortal>
+  );
+});
 DrawerContent.displayName = "DrawerContent";
 
 const DrawerHeader = ({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) => (
