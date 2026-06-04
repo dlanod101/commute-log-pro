@@ -22,6 +22,16 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog";
+import {
+  Drawer,
+  DrawerTrigger,
+  DrawerContent,
+  DrawerHeader,
+  DrawerTitle,
+  DrawerDescription,
+  DrawerFooter,
+  DrawerClose,
+} from "@/components/ui/drawer";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Toaster } from "@/components/ui/sonner";
 import { toast } from "sonner";
@@ -36,6 +46,7 @@ import {
   Wifi,
   WifiOff,
   LogOut,
+  Menu,
   Database,
   ArrowDownToLine,
   ArrowUpFromLine,
@@ -298,24 +309,67 @@ function App() {
               <span className="hidden min-[400px]:inline">GPS </span>
               {gpsStatus.toUpperCase()}
             </Badge>
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon"
-              className="h-8 w-8 sm:hidden"
-              disabled={!online}
-              aria-label="My data"
-              title={online ? "My data" : "Requires internet connection"}
-              onClick={() => {
-                if (!online) {
-                  toast.error("My data requires an internet connection");
-                  return;
-                }
-                setMyDataOpen(true);
-              }}
-            >
-              <Database className="h-4 w-4" />
-            </Button>
+            <Drawer>
+              <DrawerTrigger asChild>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8 sm:hidden"
+                  aria-label="Open menu"
+                >
+                  <Menu className="h-5 w-5" />
+                </Button>
+              </DrawerTrigger>
+              <DrawerContent>
+                <DrawerHeader>
+                  <DrawerTitle>Menu</DrawerTitle>
+                  <DrawerDescription>Quick actions</DrawerDescription>
+                </DrawerHeader>
+                <div className="flex flex-col gap-2 px-4">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    className="justify-start gap-2"
+                    disabled={!online}
+                    onClick={() => {
+                      if (!online) {
+                        toast.error("My data requires an internet connection");
+                        return;
+                      }
+                      setMyDataOpen(true);
+                    }}
+                  >
+                    <Database className="h-4 w-4" />
+                    My data
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    className="justify-start gap-2"
+                    onClick={signOut}
+                  >
+                    <LogOut className="h-4 w-4" />
+                    Sign out
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    className="justify-start gap-2"
+                    onClick={uploadAll}
+                    disabled={uploading || !online}
+                  >
+                    <Upload className="h-4 w-4" />
+                    Upload to web
+                  </Button>
+                </div>
+                <DrawerFooter>
+                  <DrawerClose asChild>
+                    <Button variant="outline" className="w-full">Close</Button>
+                  </DrawerClose>
+                </DrawerFooter>
+              </DrawerContent>
+            </Drawer>
             <Button
               type="button"
               variant="ghost"
@@ -334,16 +388,7 @@ function App() {
               <Database className="h-3.5 w-3.5" />
               My data
             </Button>
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon"
-              className="h-8 w-8 sm:hidden"
-              aria-label="Sign out"
-              onClick={signOut}
-            >
-              <LogOut className="h-4 w-4" />
-            </Button>
+            
             <Button
               type="button"
               variant="ghost"
