@@ -697,7 +697,7 @@ function ActiveTripView({
             className="h-auto min-h-14 flex-col gap-1 py-3 text-sm sm:h-16 sm:flex-row sm:gap-2 sm:text-base"
           >
             <Plus className="h-5 w-5 shrink-0" />
-            Log stop
+            Signal stop
           </Button>
           <Button
             size="lg"
@@ -717,8 +717,8 @@ function ActiveTripView({
       <StopDialog
         open={stopOpen}
         onOpenChange={setStopOpen}
-        title="Log stop"
-        submitLabel="Save stop"
+        title="Signal stop"
+        submitLabel="Save signal stop"
         onSubmit={(d) => {
           onAddStop(d);
           setStopOpen(false);
@@ -879,6 +879,10 @@ function StopDialog({
             variant={destructive ? "destructive" : "default"}
             onClick={() => {
               const fareValue = destructive && fare.trim() !== "" ? Number(fare) : undefined;
+              if (destructive && fareValue === undefined) {
+                toast.error("Total fare is required to end the trip.");
+                return;
+              }
               const delayValue = delay.trim() !== "" ? Number(delay) : undefined;
               onSubmit(
                 {

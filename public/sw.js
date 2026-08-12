@@ -1,6 +1,6 @@
 const CACHE = "t-data-v3";
 const OFFLINE_URL = "/app";
-const PRECACHE = ["/icon.svg", "/manifest.webmanifest"];
+const PRECACHE = ["/logo.png", "/manifest.webmanifest"];
 
 function isLocalDev() {
   const host = self.location.hostname;
