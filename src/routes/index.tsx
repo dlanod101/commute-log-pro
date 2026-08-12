@@ -28,9 +28,9 @@ function AuthPage() {
           <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-xl bg-gradient-hero text-primary-foreground shadow-elevated">
             <Bus className="h-7 w-7" />
           </div>
-          <h1 className="text-2xl font-semibold tracking-tight">T-data fetcher</h1>
+          <h1 className="text-2xl font-semibold tracking-tight">Dey Go</h1>
           <p className="mt-2 text-sm text-muted-foreground">
-            Sign in to collect and upload transit field data.
+            Sign in to manage paratransit trips and observations.
           </p>
         </div>
         <AuthPanel />

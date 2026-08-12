@@ -104,6 +104,12 @@ export type RemoteTripsResponse = {
   trips: RemoteTrip[];
 };
 
+export type VehicleType = {
+  id: string;
+  name: string;
+  capacity: number;
+};
+
 export async function fetchRemoteTrips(token: string): Promise<RemoteTrip[]> {
   const res = await fetch(`${API_BASE}/api/v1/data/trips`, {
     headers: { Authorization: `Bearer ${token}` },
@@ -111,6 +117,52 @@ export async function fetchRemoteTrips(token: string): Promise<RemoteTrip[]> {
   if (!res.ok) await fail(res);
   const data = (await res.json()) as RemoteTripsResponse;
   return data.trips ?? [];
+}
+
+export async function fetchVehicleTypes(token: string): Promise<VehicleType[]> {
+  const res = await fetch(`${API_BASE}/api/v1/data/vehicle-types`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok) await fail(res);
+  const data = await res.json();
+  return (Array.isArray(data) ? data : []).map((item) => ({
+    ...item,
+    id: String(item.id),
+  }));
+}
+
+export type EndTripResult = {
+  tripId: string;
+  status: "completed";
+  fare: number | null;
+  completedAt: string;
+  message: string;
+};
+
+export async function endTrip(
+  tripId: string,
+  token: string,
+  speedMps: number,
+  fare?: number | null,
+): Promise<EndTripResult> {
+  const body: Record<string, unknown> = {
+    tripId,
+    speedMps,
+  };
+  if (fare !== undefined) {
+    body.fare = fare;
+  }
+
+  const res = await fetch(`${API_BASE}/api/v1/data/trip/end`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) await fail(res);
+  return res.json();
 }
 
 function filenameFromDisposition(header: string | null, fallback: string): string {

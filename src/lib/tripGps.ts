@@ -86,7 +86,11 @@ export function backfillTripStops(trip: Trip): {
 }
 
 export type PreparedTrip = {
-  payload: Omit<Trip, "uploaded">;
+  payload: Omit<Trip, "uploaded" | "vehicle"> & {
+    vehicleType?: string;
+    passengerCapacity?: number;
+    status: "ongoing" | "completed";
+  };
   repaired: Trip;
   skippedStops: number;
   filled: number;
@@ -101,10 +105,16 @@ export function prepareTripForUpload(trip: Trip): PreparedTrip {
 
   const gps = normalizeGpsPoints(repaired.gps);
   const tripWithGps = { ...repaired, gps, stops };
-  const { uploaded: _uploaded, ...rest } = tripWithGps;
+  const { uploaded: _uploaded, vehicle, ...rest } = tripWithGps;
   const skippedStops = repaired.stops.length - stops.length;
   return {
-    payload: { ...rest, stops },
+    payload: {
+      ...rest,
+      status: tripWithGps.endedAt ? "completed" : "ongoing",
+      vehicleType: vehicle?.code,
+      passengerCapacity: vehicle?.capacity,
+      stops,
+    },
     repaired: tripWithGps,
     skippedStops,
     filled,

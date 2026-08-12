@@ -1,7 +1,7 @@
 {
-  "name": "T-data fetcher",
-  "short_name": "T-data",
-  "description": "Transit field data collection",
+  "name": "Dey Go",
+  "short_name": "Dey Go",
+  "description": "Dey Go paratransit field app",
   "start_url": "/app",
   "scope": "/",
   "display": "standalone",

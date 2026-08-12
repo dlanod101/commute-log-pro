@@ -10,6 +10,14 @@ export type GpsPoint = {
 export type StopType = "regular" | "signalized";
 export type SignalDelay = "none" | "short" | "long";
 
+export type VehicleType = {
+  id: string;
+  code: string;
+  name: string;
+  capacity: number;
+  active?: boolean;
+};
+
 export type Stop = {
   id: string;
   ts: number;
@@ -20,6 +28,7 @@ export type Stop = {
   boarding: number;
   alighting: number;
   dwellSeconds?: number;
+  delaySeconds?: number;
   intersectionName?: string;
   notes?: string;
 };
@@ -28,7 +37,8 @@ export type Trip = {
   id: string;
   origin: string;
   destination: string;
-  fare: number;
+  fare: number | null;
+  vehicle?: VehicleType;
   initialPassengers: number;
   startedAt: number;
   endedAt?: number;
@@ -36,5 +46,6 @@ export type Trip = {
   distanceMeters: number;
   gps: GpsPoint[];
   stops: Stop[];
+  status?: "ongoing" | "completed";
   uploaded?: boolean;
 };
