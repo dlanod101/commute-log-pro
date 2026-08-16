@@ -288,9 +288,7 @@ function App() {
       <header className="sticky top-0 z-20 border-b bg-background/80 pt-safe backdrop-blur">
         <div className="mx-auto flex max-w-3xl flex-col gap-2 px-3 py-2.5 sm:flex-row sm:items-center sm:justify-between sm:px-4 sm:py-3">
           <div className="flex min-w-0 items-center gap-2">
-            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-gradient-hero text-primary-foreground shadow-elevated overflow-hidden">
-              <img src="/logo.png" alt="DeyGo logo" className="h-5 w-5 object-contain" />
-            </div>
+            <img src="/logo.png" alt="DeyGo logo" className="h-8 w-auto shrink-0 object-contain" />
             <div className="min-w-0">
               <h1 className="truncate text-sm font-semibold leading-none sm:text-base">DeyGo</h1>
               <p className="hidden text-[11px] text-muted-foreground sm:block">
