@@ -1,7 +1,7 @@
 {
-  "name": "Dey Go",
-  "short_name": "Dey Go",
-  "description": "Dey Go paratransit field app",
+  "name": "DeyGo",
+  "short_name": "DeyGo",
+  "description": "DeyGo paratransit field app",
   "start_url": "/app",
   "scope": "/",
   "display": "standalone",

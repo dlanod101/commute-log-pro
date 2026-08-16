@@ -34,11 +34,11 @@ export function UpdatePopup() {
       <DialogContent className="gap-5 sm:max-w-sm">
         <DialogHeader className="text-center sm:text-center">
           <div className="mx-auto mb-3 flex h-16 w-16 items-center justify-center overflow-hidden rounded-2xl bg-gradient-hero shadow-elevated">
-            <img src="/logo.png" alt="Dey Go logo" className="h-11 w-11 object-contain" />
+            <img src="/logo.png" alt="DeyGo logo" className="h-11 w-11 object-contain" />
           </div>
           <DialogTitle className="text-lg">A new version is available</DialogTitle>
           <DialogDescription className="mx-auto max-w-[16rem] text-sm">
-            Update now to get the latest Dey Go fixes and features.
+            Update now to get the latest DeyGo fixes and features.
           </DialogDescription>
         </DialogHeader>
         <div className="flex flex-col gap-2">

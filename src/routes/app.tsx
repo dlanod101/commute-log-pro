@@ -3,7 +3,6 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { requireAuth } from "@/lib/auth-guard";
 import {
   ApiError,
-  fetchVehicleTypes,
   getMe,
   loadToken,
   saveToken,
@@ -13,7 +12,6 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -38,10 +36,10 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Toaster } from "@/components/ui/sonner";
 import { toast } from "sonner";
 import {
-  MapPin,
   Navigation,
   Square,
   Plus,
+  Pause,
   Upload,
   Trash2,
   Wifi,
@@ -56,7 +54,7 @@ import { useGps } from "@/hooks/use-gps";
 import { useOnline } from "@/hooks/use-online";
 import { loadActive, loadTrips, saveActive, saveTrips } from "@/lib/storage";
 import { appendGpsPoint, GPS_SAMPLE_INTERVAL_MS } from "@/lib/tripGps";
-import type { Stop, Trip, VehicleType } from "@/lib/types";
+import type { Stop, StopType, Trip, VehicleType } from "@/lib/types";
 import { TripStatBadge } from "@/components/TripStatBadge";
 import { MyDataSheet } from "@/components/MyDataSheet";
 
@@ -88,9 +86,6 @@ function App() {
   const [user, setUser] = useState<User | null>(null);
   const [uploading, setUploading] = useState(false);
   const [myDataOpen, setMyDataOpen] = useState(false);
-  const [vehicleTypes, setVehicleTypes] = useState<VehicleType[]>([]);
-  const [vehicleLoading, setVehicleLoading] = useState(false);
-  const [vehicleError, setVehicleError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!loadToken()) {
@@ -138,7 +133,6 @@ function App() {
   const { status: gpsStatus, last: lastPoint } = useGps(gpsActive);
   const lastFixRef = useRef(lastPoint);
   lastFixRef.current = lastPoint;
-  const isVehicleMoving = gpsStatus === "active" && typeof lastPoint?.speed === "number" && lastPoint.speed > 1;
 
   // Sample current position every 3s into trip.gps with record_type gps_point
   useEffect(() => {
@@ -154,21 +148,6 @@ function App() {
     const t = setInterval(sample, GPS_SAMPLE_INTERVAL_MS);
     return () => clearInterval(t);
   }, [gpsActive, active?.id]);
-
-  useEffect(() => {
-    const token = loadToken();
-    if (!online || !token) return;
-    setVehicleLoading(true);
-    setVehicleError(null);
-    fetchVehicleTypes(token)
-      .then((types) => setVehicleTypes(types))
-      .catch((err) => {
-        const msg = err instanceof Error ? err.message : "Unable to load vehicle types";
-        setVehicleError(msg);
-        toast.error(msg);
-      })
-      .finally(() => setVehicleLoading(false));
-  }, [online]);
 
   const startTrip = (data: {
     origin: string;
@@ -307,11 +286,11 @@ function App() {
         <div className="mx-auto flex max-w-3xl flex-col gap-2 px-3 py-2.5 sm:flex-row sm:items-center sm:justify-between sm:px-4 sm:py-3">
           <div className="flex min-w-0 items-center gap-2">
             <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-gradient-hero text-primary-foreground shadow-elevated overflow-hidden">
-              <img src="/logo.png" alt="Dey Go logo" className="h-5 w-5 object-contain" />
+              <img src="/logo.png" alt="DeyGo logo" className="h-5 w-5 object-contain" />
             </div>
             <div className="min-w-0">
               <h1 className="truncate text-sm font-semibold leading-none sm:text-base">
-                Dey Go
+                DeyGo
               </h1>
               <p className="hidden text-[11px] text-muted-foreground sm:block">
                 Paratransit trip recording and observations
@@ -443,7 +422,6 @@ function App() {
             now={now}
             onAddStop={addStop}
             onEnd={endTrip}
-            isMoving={isVehicleMoving}
           />
         ) : (
           <Tabs defaultValue="start">
@@ -454,7 +432,7 @@ function App() {
               </TabsTrigger>
             </TabsList>
             <TabsContent value="start" className="mt-4">
-              <NewTripForm onStart={startTrip} vehicleTypes={vehicleTypes} loading={vehicleLoading} error={vehicleError} />
+              <NewTripForm onStart={startTrip} />
             </TabsContent>
             <TabsContent value="history" className="mt-4 space-y-3">
               {user && (
@@ -494,25 +472,14 @@ function App() {
 // ========== NEW TRIP FORM (no fare) ==========
 function NewTripForm({
   onStart,
-  vehicleTypes,
-  loading,
-  error,
 }: {
   onStart: (d: { origin: string; destination: string; initialPassengers: number; vehicle?: VehicleType }) => void;
-  vehicleTypes: VehicleType[];
-  loading: boolean;
-  error: string | null;
 }) {
   const [origin, setOrigin] = useState("");
   const [destination, setDestination] = useState("");
   const [pax, setPax] = useState("");
-  const [vehicleId, setVehicleId] = useState("");
-
-  useEffect(() => {
-    if (!vehicleId && vehicleTypes.length > 0) {
-      setVehicleId(vehicleTypes[0].id);
-    }
-  }, [vehicleId, vehicleTypes]);
+  const [vehicleName, setVehicleName] = useState("");
+  const [vehicleCapacity, setVehicleCapacity] = useState("");
 
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -520,7 +487,15 @@ function NewTripForm({
       toast.error("Origin & destination required");
       return;
     }
-    const vehicle = vehicleTypes.find((item) => item.id === vehicleId);
+    const vehicle: VehicleType | undefined =
+      vehicleName.trim() !== ""
+        ? {
+            id: uid(),
+            code: vehicleName.trim().slice(0, 60),
+            name: vehicleName.trim().slice(0, 60),
+            capacity: Math.max(0, parseInt(vehicleCapacity) || 0),
+          }
+        : undefined;
     onStart({
       origin: origin.trim().slice(0, 80),
       destination: destination.trim().slice(0, 80),
@@ -546,29 +521,11 @@ function NewTripForm({
         </div>
         <div className="space-y-2">
           <Label>Vehicle type</Label>
-          <Select value={vehicleId} onValueChange={setVehicleId} disabled={loading || vehicleTypes.length === 0}>
-            <SelectTrigger>
-              <SelectValue
-                placeholder={
-                  loading
-                    ? "Loading vehicles..."
-                    : vehicleTypes.length
-                    ? "Select vehicle"
-                    : "No vehicles available"
-                }
-              />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectGroup>
-                {vehicleTypes.map((vehicle) => (
-                  <SelectItem key={vehicle.id} value={vehicle.id}>
-                    {vehicle.name} · {vehicle.capacity} passengers
-                  </SelectItem>
-                ))}
-              </SelectGroup>
-            </SelectContent>
-          </Select>
-          {error ? <p className="text-xs text-destructive">{error}</p> : null}
+          <Input value={vehicleName} onChange={(e) => setVehicleName(e.target.value)} maxLength={60} placeholder="e.g. Small Bus" />
+        </div>
+        <div className="space-y-2">
+          <Label>Vehicle capacity</Label>
+          <Input inputMode="numeric" value={vehicleCapacity} onChange={(e) => setVehicleCapacity(e.target.value)} placeholder="0" />
         </div>
         <Button type="submit" size="lg" className="w-full gap-2 bg-gradient-hero">
           <Navigation className="h-4 w-4" /> Start trip & GPS
@@ -587,15 +544,14 @@ function ActiveTripView({
   now,
   onAddStop,
   onEnd,
-  isMoving,
 }: {
   trip: Trip;
   now: number;
   onAddStop: (s: Omit<Stop, "id" | "ts" | "lat" | "lng">) => void;
   onEnd: (s: Omit<Stop, "id" | "ts" | "lat" | "lng">, fare?: number) => void;
-  isMoving: boolean;
 }) {
-  const [stopOpen, setStopOpen] = useState(false);
+  const [regularOpen, setRegularOpen] = useState(false);
+  const [signalOpen, setSignalOpen] = useState(false);
   const [endOpen, setEndOpen] = useState(false);
   const { passengers, totalBoard, totalAlight } = useMemo(() => {
     let p = trip.initialPassengers;
@@ -629,9 +585,9 @@ function ActiveTripView({
         </div>
         {trip.vehicle ? (
           <div className="mt-3 rounded-2xl border border-white/20 bg-white/10 p-3 text-sm text-white sm:p-4">
-            <div className="text-[11px] uppercase tracking-widest text-white/70">Vehicle</div>
+            <div className="text-[10px] uppercase tracking-widest text-white/70 sm:text-[11px]">Vehicle</div>
             <div className="mt-1 font-semibold">{trip.vehicle.name}</div>
-            <div className="text-[11px] text-white/80">{trip.vehicle.capacity} passengers</div>
+            <div className="text-xs text-white/80">{trip.vehicle.capacity} passengers</div>
           </div>
         ) : null}
       </Card>
@@ -652,7 +608,7 @@ function ActiveTripView({
         </div>
         <div className="grid grid-cols-3 gap-1.5 sm:gap-2">
           <div className="rounded-xl border bg-success/10 p-2 text-center sm:p-3">
-            <div className="flex items-center justify-center gap-0.5 text-[9px] uppercase tracking-widest text-success sm:gap-1 sm:text-[10px]">
+            <div className="flex items-center justify-center gap-0.5 text-[10px] uppercase tracking-widest text-success sm:gap-1 sm:text-[11px]">
               <ArrowDownToLine className="h-3 w-3 shrink-0" />
               <span className="truncate">Boarded</span>
             </div>
@@ -661,7 +617,7 @@ function ActiveTripView({
             </div>
           </div>
           <div className="rounded-xl border bg-destructive/10 p-2 text-center sm:p-3">
-            <div className="flex items-center justify-center gap-0.5 text-[9px] uppercase tracking-widest text-destructive sm:gap-1 sm:text-[10px]">
+            <div className="flex items-center justify-center gap-0.5 text-[10px] uppercase tracking-widest text-destructive sm:gap-1 sm:text-[11px]">
               <ArrowUpFromLine className="h-3 w-3 shrink-0" />
               <span className="truncate">Alighted</span>
             </div>
@@ -670,7 +626,7 @@ function ActiveTripView({
             </div>
           </div>
           <div className="rounded-xl border bg-secondary p-2 text-center sm:p-3">
-            <div className="text-[9px] uppercase tracking-widest text-muted-foreground sm:text-[10px]">
+            <div className="text-[10px] uppercase tracking-widest text-muted-foreground sm:text-[11px]">
               Onboard
             </div>
             <div className="mt-1 font-mono text-xl font-semibold tabular-nums sm:text-2xl">
@@ -680,47 +636,58 @@ function ActiveTripView({
         </div>
       </Card>
 
-      <div className="space-y-3">
-        {isMoving ? (
-          <Card className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900 sm:p-5">
-            <div className="font-semibold">Vehicle is moving.</div>
-            <div className="mt-1 text-sm text-muted-foreground">
-              Stop the vehicle before ending the trip.
-            </div>
-          </Card>
-        ) : null}
+      <div className="space-y-2 sm:space-y-3">
         <div className="grid grid-cols-2 gap-2 sm:gap-3">
           <Button
             size="lg"
-            onClick={() => setStopOpen(true)}
+            onClick={() => setRegularOpen(true)}
+            className="h-auto min-h-14 flex-col gap-1 py-3 text-sm sm:h-16 sm:flex-row sm:gap-2 sm:text-base"
+          >
+            <Pause className="h-5 w-5 shrink-0" />
+            Stop
+          </Button>
+          <Button
+            size="lg"
+            onClick={() => setSignalOpen(true)}
             className="h-auto min-h-14 flex-col gap-1 py-3 text-sm sm:h-16 sm:flex-row sm:gap-2 sm:text-base"
           >
             <Plus className="h-5 w-5 shrink-0" />
             Signal stop
           </Button>
-          <Button
-            size="lg"
-            variant="destructive"
-            onClick={() => setEndOpen(true)}
-            className="h-auto min-h-14 flex-col gap-1 py-3 text-sm sm:h-16 sm:flex-row sm:gap-2 sm:text-base"
-            disabled={isMoving}
-          >
-            <Square className="h-5 w-5 shrink-0" />
-            End trip
-          </Button>
         </div>
+        <Button
+          size="lg"
+          variant="destructive"
+          onClick={() => setEndOpen(true)}
+          className="h-auto min-h-14 w-full flex-col gap-1 py-3 text-sm sm:h-16 sm:flex-row sm:gap-2 sm:text-base"
+        >
+          <Square className="h-5 w-5 shrink-0" />
+          End trip
+        </Button>
       </div>
 
       {/* Stops timeline removed – stops are still saved in background */}
 
       <StopDialog
-        open={stopOpen}
-        onOpenChange={setStopOpen}
-        title="Signal stop"
-        submitLabel="Save signal stop"
+        open={regularOpen}
+        onOpenChange={setRegularOpen}
+        title="Stop"
+        submitLabel="Log stop"
+        stopType="regular"
         onSubmit={(d) => {
           onAddStop(d);
-          setStopOpen(false);
+          setRegularOpen(false);
+        }}
+      />
+      <StopDialog
+        open={signalOpen}
+        onOpenChange={setSignalOpen}
+        title="Signal stop"
+        submitLabel="Save signal stop"
+        stopType="signalized"
+        onSubmit={(d) => {
+          onAddStop(d);
+          setSignalOpen(false);
         }}
       />
       <StopDialog
@@ -729,6 +696,7 @@ function ActiveTripView({
         title="End trip at stop"
         submitLabel="End trip"
         destructive
+        stopType="signalized"
         onSubmit={(d, fare) => {
           onEnd(d, fare);
           setEndOpen(false);
@@ -746,6 +714,7 @@ function StopDialog({
   title,
   submitLabel,
   destructive,
+  stopType,
   onSubmit,
 }: {
   open: boolean;
@@ -753,6 +722,7 @@ function StopDialog({
   title: string;
   submitLabel: string;
   destructive?: boolean;
+  stopType: StopType;
   onSubmit: (s: Omit<Stop, "id" | "ts" | "lat" | "lng">, fare?: number) => void;
 }) {
   const [board, setBoard] = useState("0");
@@ -761,7 +731,6 @@ function StopDialog({
   const [dwellStart, setDwellStart] = useState<number | null>(null);
   const [dwellPaused, setDwellPaused] = useState<number>(0);
   const [tick, setTick] = useState(0);
-  const [delay, setDelay] = useState("");
   const [fare, setFare] = useState("");
 
   useEffect(() => {
@@ -769,12 +738,11 @@ function StopDialog({
       setBoard("0");
       setAlight("0");
       setNotes("");
-      setDwellStart(Date.now());
+      setDwellStart(stopType === "signalized" ? Date.now() : null);
       setDwellPaused(0);
-      setDelay("");
       setFare("");
     }
-  }, [open]);
+  }, [open, stopType]);
 
   useEffect(() => {
     if (!open || dwellStart === null) return;
@@ -793,37 +761,39 @@ function StopDialog({
           <DialogTitle>{title}</DialogTitle>
         </DialogHeader>
         <div className="space-y-4">
-          <div className="rounded-lg border bg-secondary/40 p-3">
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-              <div>
-                <div className="text-[10px] uppercase tracking-widest text-muted-foreground">
-                  Signal Stop time
+          {stopType === "signalized" && (
+            <div className="rounded-lg border bg-secondary/40 p-3">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <div className="text-[10px] uppercase tracking-widest text-muted-foreground">
+                    Signal Stop time
+                  </div>
+                  <div className="font-mono text-xl font-semibold tabular-nums sm:text-2xl">
+                    {fmtDuration(dwellMs)}
+                  </div>
                 </div>
-                <div className="font-mono text-xl font-semibold tabular-nums sm:text-2xl">
-                  {fmtDuration(dwellMs)}
-                </div>
+                <Button
+                  type="button"
+                  size="sm"
+                  className="w-full shrink-0 sm:w-auto"
+                  variant={dwellStart === null ? "default" : "outline"}
+                  onClick={() => {
+                    if (dwellStart === null) {
+                      setDwellStart(Date.now());
+                    } else {
+                      setDwellPaused(dwellPaused + (Date.now() - dwellStart));
+                      setDwellStart(null);
+                    }
+                  }}
+                >
+                  {dwellStart === null ? "Resume" : "Stop timer"}
+                </Button>
               </div>
-              <Button
-                type="button"
-                size="sm"
-                className="w-full shrink-0 sm:w-auto"
-                variant={dwellStart === null ? "default" : "outline"}
-                onClick={() => {
-                  if (dwellStart === null) {
-                    setDwellStart(Date.now());
-                  } else {
-                    setDwellPaused(dwellPaused + (Date.now() - dwellStart));
-                    setDwellStart(null);
-                  }
-                }}
-              >
-                {dwellStart === null ? "Resume" : "Stop timer"}
-              </Button>
+              <p className="mt-2 text-xs text-muted-foreground">
+                Auto-started when stop logged. Stop the timer when the vehicle moves.
+              </p>
             </div>
-            <p className="mt-2 text-[11px] text-muted-foreground">
-              Auto-started when stop logged. Stop the timer when the vehicle moves.
-            </p>
-          </div>
+          )}
 
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-2">
@@ -836,36 +806,25 @@ function StopDialog({
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-2">
-              <Label>Delay time (seconds)</Label>
-              <Input
-                inputMode="numeric"
-                value={delay}
-                onChange={(e) => setDelay(e.target.value)}
-                placeholder="Optional"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label>Observation (optional)</Label>
-              <Textarea
-                value={notes}
-                onChange={(e) => setNotes(e.target.value)}
-                maxLength={500}
-                placeholder="Enter observations for this stop…"
-                rows={3}
-              />
-            </div>
+          <div className="space-y-2">
+            <Label>Observation (optional)</Label>
+            <Textarea
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              maxLength={500}
+              placeholder="Enter observations for this stop…"
+              rows={3}
+            />
           </div>
 
           {destructive && (
             <div className="space-y-2">
-              <Label>Total fare (₦)</Label>
+              <Label>Total fare (₦) *</Label>
               <Input
                 inputMode="decimal"
                 value={fare}
                 onChange={(e) => setFare(e.target.value)}
-                placeholder="Optional"
+                placeholder="Required"
               />
             </div>
           )}
@@ -878,16 +837,14 @@ function StopDialog({
             variant={destructive ? "destructive" : "default"}
             onClick={() => {
               const fareValue = destructive && fare.trim() !== "" ? Number(fare) : undefined;
-              if (destructive && fareValue === undefined) {
-                toast.error("Total fare is required to end the trip.");
+              if (destructive && (fareValue === undefined || Number.isNaN(fareValue) || fareValue < 0)) {
+                toast.error("A valid total fare is required to end the trip.");
                 return;
               }
-              const delayValue = delay.trim() !== "" ? Number(delay) : undefined;
               onSubmit(
                 {
-                  type: "signalized",
-                  dwellSeconds: dwellSec,
-                  delaySeconds: delayValue,
+                  type: stopType,
+                  dwellSeconds: stopType === "signalized" ? dwellSec : undefined,
                   boarding: Math.max(0, parseInt(board) || 0),
                   alighting: Math.max(0, parseInt(alight) || 0),
                   notes: notes.trim() || undefined,
@@ -912,7 +869,7 @@ function StopObservationsList({ stops }: { stops: Stop[] }) {
       <div className="mb-3 flex items-center justify-between">
         <div>
           <h3 className="text-sm font-semibold">Stop observations</h3>
-          <p className="text-[11px] text-muted-foreground">
+          <p className="text-xs text-muted-foreground">
             Each visit is shown separately, even for the same stop.
           </p>
         </div>
@@ -930,12 +887,15 @@ function StopObservationsList({ stops }: { stops: Stop[] }) {
             <div key={stop.id} className="rounded-2xl border bg-muted/5 p-4 sm:p-5">
               <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
                 <div>
-                  <div className="text-[11px] uppercase tracking-widest text-muted-foreground">
-                    {stop.intersectionName || "Unknown stop"}
+                  <div className="text-[10px] uppercase tracking-widest text-muted-foreground sm:text-[11px]">
+                    {stop.type === "signalized" ? "Signal stop" : "Regular stop"}
+                    {stop.intersectionName ? ` · ${stop.intersectionName}` : ""}
                   </div>
                   <div className="mt-1 font-semibold">{new Date(stop.ts).toLocaleTimeString()}</div>
                 </div>
-                <div className="text-sm text-muted-foreground">Signal stop entry</div>
+                <div className="text-sm text-muted-foreground">
+                  {stop.type === "signalized" ? "Signal stop entry" : "Regular stop entry"}
+                </div>
               </div>
               <p className="mt-3 text-sm leading-6 text-foreground">{stop.notes}</p>
             </div>
@@ -961,7 +921,7 @@ function TripCard({ trip, onDelete }: { trip: Trip; onDelete: () => void }) {
           <div className="mt-1 text-sm font-semibold leading-snug sm:truncate">
             {trip.origin} → {trip.destination}
           </div>
-          <div className="mt-1 text-[11px] text-muted-foreground">
+          <div className="mt-1 text-xs text-muted-foreground">
             {new Date(trip.startedAt).toLocaleString()}
           </div>
         </div>

@@ -1,4 +1,4 @@
-# Dey Go — Backend Changes for Frontend Integration
+# DeyGo — Backend Changes for Frontend Integration
 
 > **For:** Frontend / mobile client teams
 > **Backend version:** 0.2.0 (2026-08-12)

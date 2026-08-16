@@ -7,7 +7,7 @@ export function TripStatBadge({ label, value, accent }: Props) {
         accent ? "bg-gradient-signal text-signal-foreground border-transparent" : "bg-card"
       }`}
     >
-      <div className="text-[9px] uppercase tracking-widest opacity-70 sm:text-[10px]">{label}</div>
+      <div className="text-[10px] uppercase tracking-widest opacity-70 sm:text-[11px]">{label}</div>
       <div className="font-mono text-base font-semibold tabular-nums sm:text-lg">{value}</div>
     </div>
   );

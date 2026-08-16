@@ -25,9 +25,9 @@ function AuthPage() {
       <div className="mx-auto flex w-full max-w-md flex-1 flex-col justify-center px-3 py-8 pb-safe sm:px-4 sm:py-12">
         <div className="mb-8 text-center">
           <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-xl bg-gradient-hero text-primary-foreground shadow-elevated overflow-hidden">
-            <img src="/logo.png" alt="Dey Go logo" className="h-7 w-7 object-contain" />
+            <img src="/logo.png" alt="DeyGo logo" className="h-7 w-7 object-contain" />
           </div>
-          <h1 className="text-2xl font-semibold tracking-tight">Dey Go</h1>
+          <h1 className="text-2xl font-semibold tracking-tight">DeyGo</h1>
           <p className="mt-2 text-sm text-muted-foreground">
             Sign in to manage paratransit trips and observations.
           </p>
