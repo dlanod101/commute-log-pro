@@ -47,8 +47,16 @@ export const Route = createRootRoute({
       { name: "twitter:site", content: "@DeyGo" },
       { name: "twitter:title", content: "DeyGo" },
       { name: "twitter:description", content: "DeyGo paratransit field app" },
-      { property: "og:image", content: "https://storage.googleapis.com/gpt-engineer-file-uploads/attachments/og-images/26a05043-0dd9-459d-88eb-364fbe0adaba" },
-      { name: "twitter:image", content: "https://storage.googleapis.com/gpt-engineer-file-uploads/attachments/og-images/26a05043-0dd9-459d-88eb-364fbe0adaba" },
+      {
+        property: "og:image",
+        content:
+          "https://storage.googleapis.com/gpt-engineer-file-uploads/attachments/og-images/26a05043-0dd9-459d-88eb-364fbe0adaba",
+      },
+      {
+        name: "twitter:image",
+        content:
+          "https://storage.googleapis.com/gpt-engineer-file-uploads/attachments/og-images/26a05043-0dd9-459d-88eb-364fbe0adaba",
+      },
     ],
     links: [
       {

@@ -1,7 +1,8 @@
-# API Analyses — Commute Log Pro ("Dey Go")
+# API Analyses — Commute Log Pro ("DeyGo")
 
 > **Scope:** Every outbound API call in the project, the endpoint hit, and the exact data sent.
 > **Method:** All network I/O flows through a single module, `src/lib/api.ts` (`API_BASE`). UI components call the wrapper functions; there are no other `fetch`/`axios`/`WebSocket`/`sendBeacon` calls anywhere in `src/`.
+> **Last updated:** 2026-08-16 — reflects commit `e7334e4` (branding "Dey Go" → "DeyGo"; vehicle-type fetch removed from the app route; vehicle fields on uploads are now manual free-text inputs).
 
 ## Base URL
 
@@ -27,7 +28,7 @@ Defined as `API_BASE` in `src/lib/api.ts` (line 4). All endpoints are relative t
 | 2 | POST | `/api/v1/auth/login` | `login()` | ✅ | `AuthPanel.tsx` (sign-in form) |
 | 3 | GET | `/api/v1/auth/me` | `getMe()` | ✅ | `AuthPanel.tsx`, `routes/app.tsx` (mount) |
 | 4 | GET | `/api/v1/data/trips` | `fetchRemoteTrips()` | ✅ | `MyDataSheet.tsx` (open/refresh) |
-| 5 | GET | `/api/v1/data/vehicle-types` | `fetchVehicleTypes()` | ✅ | `routes/app.tsx` (mount, when online) |
+| 5 | GET | `/api/v1/data/vehicle-types` | `fetchVehicleTypes()` | ⚠️ Defined, **not currently called** | — |
 | 6 | POST | `/api/v1/data/trip/end` | `endTrip()` | ⚠️ Defined, **not currently called** | — |
 | 7 | GET | `/api/v1/data/process/{tripId}` | `downloadTripProcessZip()` | ✅ | `MyDataSheet.tsx` ("CSV ZIP") |
 | 8 | GET | `/api/v1/data/process/{tripId}/shapefile` | `downloadTripShapefileZip()` | ✅ | `MyDataSheet.tsx` ("Shapefile") |
@@ -96,10 +97,10 @@ Defined as `API_BASE` in `src/lib/api.ts` (line 4). All endpoints are relative t
 ## 5. List vehicle types — `GET /api/v1/data/vehicle-types`
 
 - **Function:** `fetchVehicleTypes()` — `src/lib/api.ts` (line 119)
-- **Called from:** `src/routes/app.tsx` (line 163) — `useEffect` on mount whenever the app is online; populates the vehicle picker in the "New trip" form.
-- **Headers:** `Authorization: Bearer <token>`.
+- **Status:** ⚠️ **Defined but NOT currently called.** As of commit `e7334e4` the vehicle-type fetch was **removed from the app route** (`src/routes/app.tsx`). Previously it populated a `Select` vehicle picker on mount (when online); that picker has been replaced with manual free-text inputs, so this wrapper has no call sites today. It is retained in `api.ts` for future use (per `FRONTEND_INTEGRATION_NOTES.md` §2.6).
+- **Headers (when invoked):** `Authorization: Bearer <token>`.
 - **Body / query:** none.
-- **Response:** `VehicleType[]` — `{ id, code, name, capacity, active? }` (the client stringifies `id`/`code`). These values later flow into uploads as `vehicleType` / `passengerCapacity`.
+- **Response (when invoked):** `VehicleType[]` — `{ id, code, name, capacity, active? }` (the client stringifies `id`/`code`).
 
 ---
 
@@ -169,8 +170,8 @@ Defined as `API_BASE` in `src/lib/api.ts` (line 4). All endpoints are relative t
       "endStopId": "stop-004",                // only if completed
       "distanceMeters": 4500,
       "status": "completed",                  // "ongoing" | "completed"
-      "vehicleType": "medium_bus",            // vehicle.code, optional
-      "passengerCapacity": 20,                // vehicle.capacity, optional
+      "vehicleType": "Small Bus",             // optional — free-text from the form (see note below)
+      "passengerCapacity": 20,                // optional — manually-entered capacity
       "gps": [
         {
           "record_type": "gps_point",
@@ -200,6 +201,7 @@ Defined as `API_BASE` in `src/lib/api.ts` (line 4). All endpoints are relative t
     }
     ```
 - **Data origin:** everything in the payload was captured locally — trip metadata from `NewTripForm`, GPS points sampled every 3s via `navigator.geolocation.watchPosition` (`use-gps.ts`) + `appendGpsPoint`, and stop data (boarding/alighting/dwell/delay/notes) from `StopDialog`.
+- **Vehicle fields:** as of commit `e7334e4` the server-driven vehicle picker was replaced with **manual free-text inputs** in `NewTripForm`. The typed name is sent as both `vehicleType` and `vehicle.name`/`code` (≤ 60 chars, local uid), and the typed capacity as `passengerCapacity`/`vehicle.capacity`. If both vehicle fields are left blank, `vehicleType` / `passengerCapacity` are omitted from the payload.
 - **Response:** the server body is *not* read; the function returns locally-computed `{ repaired, skippedStops, filled }` used only for UI messaging.
 
 ---
@@ -217,7 +219,7 @@ Defined as `API_BASE` in `src/lib/api.ts` (line 4). All endpoints are relative t
 ## Summary of sensitive data leaving the device
 
 1. **Credentials:** email + plaintext password → `/api/v1/auth/login` and `/api/v1/auth/register`.
-2. **Bearer token** (identity credential) → every authenticated endpoint (`/me`, `/data/trips`, `/data/vehicle-types`, `/data/upload`, `/data/process/…`).
+2. **Bearer token** (identity credential) → every authenticated endpoint (`/me`, `/data/trips`, `/data/upload`, `/data/process/…`; `/data/vehicle-types` would also receive it if the retained wrapper is ever wired).
 3. **Trip data** (GPS tracks = precise location history, stop coordinates, passenger counts, fares, dwell/delay times, free-text observations) → `/api/v1/data/upload`.
 4. **Trip id + GPS speed + optional fare** → `/api/v1/data/trip/end` (wrapper present, not yet invoked).
 5. **Trip id** (in URL) + token → download endpoints `/api/v1/data/process/…`.

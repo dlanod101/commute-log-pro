@@ -61,18 +61,31 @@ export function usePwa() {
 
       const reg = await navigator.serviceWorker.register("/sw.js", { scope: "/" });
       registrationRef.current = reg;
-      markWaitingWorker(reg);
 
-      reg.addEventListener("updatefound", () => {
-        const worker = reg.installing;
-        if (!worker) return;
+      // An update can already be installing/waiting by the time register()
+      // resolves (the updatefound event may have already fired), so cover that
+      // state as well as future installs — otherwise a freshly-deployed
+      // version can be missed and the update popup never shows.
+      const watchWorker = (worker: ServiceWorker) => {
         worker.addEventListener("statechange", () => {
           if (worker.state === "installed" && navigator.serviceWorker.controller) {
             waitingWorkerRef.current = reg.waiting ?? worker;
             setUpdateAvailable(true);
           }
         });
+      };
+
+      markWaitingWorker(reg);
+      if (reg.installing) watchWorker(reg.installing);
+
+      reg.addEventListener("updatefound", () => {
+        const worker = reg.installing;
+        if (worker) watchWorker(worker);
       });
+
+      // Force an immediate update check so the popup appears on the very first
+      // load after a release, rather than relying only on the 15-minute poll.
+      void reg.update().catch(() => {});
     };
 
     void registerServiceWorker();

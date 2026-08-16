@@ -1,14 +1,7 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { requireAuth } from "@/lib/auth-guard";
-import {
-  ApiError,
-  getMe,
-  loadToken,
-  saveToken,
-  uploadTrips,
-  type User,
-} from "@/lib/api";
+import { ApiError, getMe, loadToken, saveToken, uploadTrips, type User } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -289,9 +282,7 @@ function App() {
               <img src="/logo.png" alt="DeyGo logo" className="h-5 w-5 object-contain" />
             </div>
             <div className="min-w-0">
-              <h1 className="truncate text-sm font-semibold leading-none sm:text-base">
-                DeyGo
-              </h1>
+              <h1 className="truncate text-sm font-semibold leading-none sm:text-base">DeyGo</h1>
               <p className="hidden text-[11px] text-muted-foreground sm:block">
                 Paratransit trip recording and observations
               </p>
@@ -299,7 +290,11 @@ function App() {
           </div>
           <div className="flex flex-wrap items-center gap-1.5 sm:justify-end">
             <Badge variant="outline" className="gap-1 font-mono text-[10px]">
-              {online ? <Wifi className="h-3 w-3 shrink-0" /> : <WifiOff className="h-3 w-3 shrink-0" />}
+              {online ? (
+                <Wifi className="h-3 w-3 shrink-0" />
+              ) : (
+                <WifiOff className="h-3 w-3 shrink-0" />
+              )}
               <span className="hidden min-[360px]:inline">{online ? "ONLINE" : "OFFLINE"}</span>
             </Badge>
             <Badge
@@ -312,7 +307,7 @@ function App() {
               <span className="hidden min-[400px]:inline">GPS </span>
               {gpsStatus.toUpperCase()}
             </Badge>
-            
+
             <Button
               type="button"
               variant="ghost"
@@ -331,7 +326,7 @@ function App() {
               <Database className="h-3.5 w-3.5" />
               My data
             </Button>
-            
+
             <Button
               type="button"
               variant="ghost"
@@ -399,7 +394,9 @@ function App() {
                 </div>
                 <DrawerFooter>
                   <DrawerClose asChild>
-                    <Button variant="outline" className="w-full">Close</Button>
+                    <Button variant="outline" className="w-full">
+                      Close
+                    </Button>
                   </DrawerClose>
                 </DrawerFooter>
               </DrawerContent>
@@ -417,12 +414,7 @@ function App() {
 
       <main className="mx-auto max-w-3xl px-3 pb-28 pt-4 sm:px-4 sm:pb-24 sm:pt-6">
         {active ? (
-          <ActiveTripView
-            trip={active}
-            now={now}
-            onAddStop={addStop}
-            onEnd={endTrip}
-          />
+          <ActiveTripView trip={active} now={now} onAddStop={addStop} onEnd={endTrip} />
         ) : (
           <Tabs defaultValue="start">
             <TabsList className="grid w-full grid-cols-2">
@@ -473,7 +465,12 @@ function App() {
 function NewTripForm({
   onStart,
 }: {
-  onStart: (d: { origin: string; destination: string; initialPassengers: number; vehicle?: VehicleType }) => void;
+  onStart: (d: {
+    origin: string;
+    destination: string;
+    initialPassengers: number;
+    vehicle?: VehicleType;
+  }) => void;
 }) {
   const [origin, setOrigin] = useState("");
   const [destination, setDestination] = useState("");
@@ -509,23 +506,48 @@ function NewTripForm({
       <form onSubmit={submit} className="space-y-4">
         <div className="space-y-2">
           <Label>Origin</Label>
-          <Input value={origin} onChange={(e) => setOrigin(e.target.value)} maxLength={80} placeholder="e.g. Central Station" />
+          <Input
+            value={origin}
+            onChange={(e) => setOrigin(e.target.value)}
+            maxLength={80}
+            placeholder="e.g. Central Station"
+          />
         </div>
         <div className="space-y-2">
           <Label>Destination</Label>
-          <Input value={destination} onChange={(e) => setDestination(e.target.value)} maxLength={80} placeholder="e.g. Airport" />
+          <Input
+            value={destination}
+            onChange={(e) => setDestination(e.target.value)}
+            maxLength={80}
+            placeholder="e.g. Airport"
+          />
         </div>
         <div className="space-y-2">
           <Label>Passengers @ start</Label>
-          <Input inputMode="numeric" value={pax} onChange={(e) => setPax(e.target.value)} placeholder="0" />
+          <Input
+            inputMode="numeric"
+            value={pax}
+            onChange={(e) => setPax(e.target.value)}
+            placeholder="0"
+          />
         </div>
         <div className="space-y-2">
           <Label>Vehicle type</Label>
-          <Input value={vehicleName} onChange={(e) => setVehicleName(e.target.value)} maxLength={60} placeholder="e.g. Small Bus" />
+          <Input
+            value={vehicleName}
+            onChange={(e) => setVehicleName(e.target.value)}
+            maxLength={60}
+            placeholder="e.g. Small Bus"
+          />
         </div>
         <div className="space-y-2">
           <Label>Vehicle capacity</Label>
-          <Input inputMode="numeric" value={vehicleCapacity} onChange={(e) => setVehicleCapacity(e.target.value)} placeholder="0" />
+          <Input
+            inputMode="numeric"
+            value={vehicleCapacity}
+            onChange={(e) => setVehicleCapacity(e.target.value)}
+            placeholder="0"
+          />
         </div>
         <Button type="submit" size="lg" className="w-full gap-2 bg-gradient-hero">
           <Navigation className="h-4 w-4" /> Start trip & GPS
@@ -585,7 +607,9 @@ function ActiveTripView({
         </div>
         {trip.vehicle ? (
           <div className="mt-3 rounded-2xl border border-white/20 bg-white/10 p-3 text-sm text-white sm:p-4">
-            <div className="text-[10px] uppercase tracking-widest text-white/70 sm:text-[11px]">Vehicle</div>
+            <div className="text-[10px] uppercase tracking-widest text-white/70 sm:text-[11px]">
+              Vehicle
+            </div>
             <div className="mt-1 font-semibold">{trip.vehicle.name}</div>
             <div className="text-xs text-white/80">{trip.vehicle.capacity} passengers</div>
           </div>
@@ -802,7 +826,11 @@ function StopDialog({
             </div>
             <div className="space-y-2">
               <Label>Alighting</Label>
-              <Input inputMode="numeric" value={alight} onChange={(e) => setAlight(e.target.value)} />
+              <Input
+                inputMode="numeric"
+                value={alight}
+                onChange={(e) => setAlight(e.target.value)}
+              />
             </div>
           </div>
 
@@ -837,7 +865,10 @@ function StopDialog({
             variant={destructive ? "destructive" : "default"}
             onClick={() => {
               const fareValue = destructive && fare.trim() !== "" ? Number(fare) : undefined;
-              if (destructive && (fareValue === undefined || Number.isNaN(fareValue) || fareValue < 0)) {
+              if (
+                destructive &&
+                (fareValue === undefined || Number.isNaN(fareValue) || fareValue < 0)
+              ) {
                 toast.error("A valid total fare is required to end the trip.");
                 return;
               }
