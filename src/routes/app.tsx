@@ -123,16 +123,25 @@ function App() {
   }, [active]);
 
   const gpsActive = !!active && !active.endedAt;
-  const { status: gpsStatus, last: lastPoint } = useGps(gpsActive);
+  const {
+    status: gpsStatus,
+    last: lastPoint,
+    best: bestPoint,
+    accuracy: gpsAccuracy,
+  } = useGps(gpsActive);
   const lastFixRef = useRef(lastPoint);
   lastFixRef.current = lastPoint;
+  const bestFixRef = useRef(bestPoint);
+  bestFixRef.current = bestPoint;
 
   // Sample current position every 3s into trip.gps with record_type gps_point
   useEffect(() => {
     if (!gpsActive) return;
 
     const sample = () => {
-      const fix = lastFixRef.current;
+      // Prefer the most accurate fix from the recent window, fall back to the
+      // latest raw fix when none is available yet.
+      const fix = bestFixRef.current ?? lastFixRef.current;
       if (!fix) return;
       setActive((prev) => (prev ? appendGpsPoint(prev, fix) : prev));
     };
@@ -166,6 +175,7 @@ function App() {
   };
 
   const stopCoords = () => {
+    if (bestPoint) return { lat: bestPoint.lat, lng: bestPoint.lng };
     if (lastPoint) return { lat: lastPoint.lat, lng: lastPoint.lng };
     const last = active?.gps[active.gps.length - 1];
     if (last) return { lat: last.lat, lng: last.lng };
@@ -306,6 +316,9 @@ function App() {
               <Navigation className="h-3 w-3 shrink-0" />
               <span className="hidden min-[400px]:inline">GPS </span>
               {gpsStatus.toUpperCase()}
+              {gpsAccuracy != null && gpsStatus === "active" && (
+                <span className="text-[10px]">· {Math.round(gpsAccuracy)}m</span>
+              )}
             </Badge>
 
             <Button
