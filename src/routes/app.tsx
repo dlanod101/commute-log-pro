@@ -43,7 +43,6 @@ import {
   Square,
   Plus,
   Upload,
-  Bus,
   Trash2,
   Wifi,
   WifiOff,
@@ -162,7 +161,7 @@ function App() {
     setVehicleLoading(true);
     setVehicleError(null);
     fetchVehicleTypes(token)
-      .then(setVehicleTypes)
+      .then((types) => setVehicleTypes(types))
       .catch((err) => {
         const msg = err instanceof Error ? err.message : "Unable to load vehicle types";
         setVehicleError(msg);
@@ -307,8 +306,8 @@ function App() {
       <header className="sticky top-0 z-20 border-b bg-background/80 pt-safe backdrop-blur">
         <div className="mx-auto flex max-w-3xl flex-col gap-2 px-3 py-2.5 sm:flex-row sm:items-center sm:justify-between sm:px-4 sm:py-3">
           <div className="flex min-w-0 items-center gap-2">
-            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-gradient-hero text-primary-foreground shadow-elevated">
-              <Bus className="h-5 w-5" />
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-gradient-hero text-primary-foreground shadow-elevated overflow-hidden">
+              <img src="/logo.png" alt="Dey Go logo" className="h-5 w-5 object-contain" />
             </div>
             <div className="min-w-0">
               <h1 className="truncate text-sm font-semibold leading-none sm:text-base">
@@ -377,7 +376,7 @@ function App() {
                   <Menu className="h-5 w-5" />
                 </Button>
               </DrawerTrigger>
-              <DrawerContent side="right">
+              <DrawerContent>
                 <DrawerHeader>
                   <DrawerTitle>Menu</DrawerTitle>
                   <DrawerDescription>Quick actions</DrawerDescription>

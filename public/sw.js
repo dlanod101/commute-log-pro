@@ -1,4 +1,5 @@
-const CACHE = "t-data-v3";
+const SW_VERSION = "__SW_VERSION__";
+const CACHE = `t-data-${SW_VERSION}`;
 const OFFLINE_URL = "/app";
 const PRECACHE = ["/logo.png", "/manifest.webmanifest"];
 
@@ -25,6 +26,7 @@ self.addEventListener("message", (event) => {
 });
 
 self.addEventListener("activate", (event) => {
+  console.log("[sw] activated", SW_VERSION);
   event.waitUntil(
     caches.keys().then((keys) =>
       Promise.all(keys.filter((k) => k !== CACHE).map((k) => caches.delete(k))),

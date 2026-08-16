@@ -5,7 +5,9 @@
   "type": "module",
   "scripts": {
     "dev": "vite dev",
+    "prebuild": "node scripts/stamp-sw.mjs stamp",
     "build": "vite build",
+    "postbuild": "node scripts/stamp-sw.mjs restore",
     "build:dev": "vite build --mode development",
     "preview": "vite preview",
     "start": "node .output/server/index.mjs",

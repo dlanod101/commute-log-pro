@@ -81,7 +81,7 @@ export function usePwa() {
       () => {
         void navigator.serviceWorker?.ready.then((reg) => reg.update());
       },
-      import.meta.env.DEV ? 30_000 : 60 * 60 * 1000,
+      import.meta.env.DEV ? 30_000 : 15 * 60 * 1000,
     );
 
     return () => {

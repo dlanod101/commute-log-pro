@@ -2,6 +2,7 @@ import { Outlet, Link, createRootRoute, HeadContent, Scripts } from "@tanstack/r
 
 import appCss from "../styles.css?url";
 import { PwaFloatingActions } from "@/components/PwaFloatingActions";
+import { UpdatePopup } from "@/components/UpdatePopup";
 
 function NotFoundComponent() {
   return (
@@ -83,6 +84,7 @@ function RootComponent() {
     <>
       <Outlet />
       <PwaFloatingActions />
+      <UpdatePopup />
     </>
   );
 }

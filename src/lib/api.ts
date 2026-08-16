@@ -1,7 +1,10 @@
-import type { Trip } from "./types";
-import { prepareTripsForUpload } from "./tripGps";
+import type { Trip, VehicleType } from "@/lib/types";
+import { prepareTripsForUpload } from "@/lib/tripGps";
 
 export const API_BASE = "https://data-collection-backend-chi.vercel.app";
+import type { Trip, VehicleType } from "@/lib/types";
+import { prepareTripsForUpload } from "@/lib/tripGps";
+
 
 const TOKEN_KEY = "transit_auth_token_v1";
 
@@ -104,12 +107,6 @@ export type RemoteTripsResponse = {
   trips: RemoteTrip[];
 };
 
-export type VehicleType = {
-  id: string;
-  name: string;
-  capacity: number;
-};
-
 export async function fetchRemoteTrips(token: string): Promise<RemoteTrip[]> {
   const res = await fetch(`${API_BASE}/api/v1/data/trips`, {
     headers: { Authorization: `Bearer ${token}` },
@@ -128,7 +125,8 @@ export async function fetchVehicleTypes(token: string): Promise<VehicleType[]> {
   return (Array.isArray(data) ? data : []).map((item) => ({
     ...item,
     id: String(item.id),
-  }));
+    code: String(item.code),
+  })) as VehicleType[];
 }
 
 export type EndTripResult = {
