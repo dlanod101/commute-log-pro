@@ -1,7 +1,15 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { requireAuth } from "@/lib/auth-guard";
-import { ApiError, getMe, loadToken, saveToken, uploadTrips, type User } from "@/lib/api";
+import {
+  ApiError,
+  fetchAdminUsers,
+  getMe,
+  loadToken,
+  saveToken,
+  uploadTrips,
+  type User,
+} from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -80,6 +88,7 @@ function App() {
   const [user, setUser] = useState<User | null>(null);
   const [uploading, setUploading] = useState(false);
   const [myDataOpen, setMyDataOpen] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
 
   useEffect(() => {
     if (!loadToken()) {
@@ -92,6 +101,16 @@ function App() {
     if (token) {
       getMe(token)
         .then(setUser)
+        .catch((err) => {
+          if (err instanceof ApiError && err.status === 401) {
+            saveToken(null);
+            navigate({ to: "/" });
+          }
+        });
+      // Only admins/superadmins can use the admin console. Probe access so the
+      // Admin button only appears for them (403 = regular user, keep it hidden).
+      fetchAdminUsers(token, { limit: 1 })
+        .then(() => setIsAdmin(true))
         .catch((err) => {
           if (err instanceof ApiError && err.status === 401) {
             saveToken(null);
@@ -339,16 +358,18 @@ function App() {
               My data
             </Button>
 
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              className="hidden gap-1 text-xs sm:inline-flex"
-              onClick={() => navigate({ to: "/admin" })}
-            >
-              <Shield className="h-3.5 w-3.5" />
-              Admin
-            </Button>
+            {isAdmin && (
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="hidden gap-1 text-xs sm:inline-flex"
+                onClick={() => navigate({ to: "/admin" })}
+              >
+                <Shield className="h-3.5 w-3.5" />
+                Admin
+              </Button>
+            )}
 
             <Button
               type="button"
@@ -395,15 +416,17 @@ function App() {
                     <Database className="h-4 w-4" />
                     My data
                   </Button>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    className="justify-start gap-2"
-                    onClick={() => navigate({ to: "/admin" })}
-                  >
-                    <Shield className="h-4 w-4" />
-                    Admin
-                  </Button>
+                  {isAdmin && (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      className="justify-start gap-2"
+                      onClick={() => navigate({ to: "/admin" })}
+                    >
+                      <Shield className="h-4 w-4" />
+                      Admin
+                    </Button>
+                  )}
                   <Button
                     type="button"
                     variant="ghost"
