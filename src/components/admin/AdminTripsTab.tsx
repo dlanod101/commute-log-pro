@@ -131,12 +131,15 @@ export function AdminTripsTab({ onSessionExpired }: Props) {
       <div className="flex flex-col gap-2 lg:flex-row lg:items-end lg:flex-wrap">
         <div className="space-y-1.5">
           <Label htmlFor="trip-status">Status</Label>
-          <Select value={statusFilter} onValueChange={setStatusFilter}>
+          <Select
+            value={statusFilter || undefined}
+            onValueChange={(v) => setStatusFilter(v === "all" ? "" : v)}
+          >
             <SelectTrigger id="trip-status" className="w-full lg:w-40">
               <SelectValue placeholder="All statuses" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="">All statuses</SelectItem>
+              <SelectItem value="all">All statuses</SelectItem>
               <SelectItem value="completed">Completed</SelectItem>
               <SelectItem value="ongoing">Ongoing</SelectItem>
             </SelectContent>

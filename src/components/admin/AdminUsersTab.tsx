@@ -155,9 +155,9 @@ export function AdminUsersTab({ isSuperAdmin, onSessionExpired }: Props) {
             />
           </div>
           <Select
-            value={roleFilter}
+            value={roleFilter || undefined}
             onValueChange={(v) => {
-              setRoleFilter(v);
+              setRoleFilter(v === "all" ? "" : v);
               setOffset(0);
             }}
           >
@@ -165,16 +165,16 @@ export function AdminUsersTab({ isSuperAdmin, onSessionExpired }: Props) {
               <SelectValue placeholder="All roles" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="">All roles</SelectItem>
+              <SelectItem value="all">All roles</SelectItem>
               <SelectItem value="user">User</SelectItem>
               <SelectItem value="admin">Admin</SelectItem>
               <SelectItem value="superadmin">Superadmin</SelectItem>
             </SelectContent>
           </Select>
           <Select
-            value={statusFilter}
+            value={statusFilter || undefined}
             onValueChange={(v) => {
-              setStatusFilter(v);
+              setStatusFilter(v === "all" ? "" : v);
               setOffset(0);
             }}
           >
@@ -182,7 +182,7 @@ export function AdminUsersTab({ isSuperAdmin, onSessionExpired }: Props) {
               <SelectValue placeholder="All statuses" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="">All statuses</SelectItem>
+              <SelectItem value="all">All statuses</SelectItem>
               <SelectItem value="true">Active</SelectItem>
               <SelectItem value="false">Disabled</SelectItem>
             </SelectContent>
