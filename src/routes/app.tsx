@@ -40,6 +40,7 @@ import {
   LogOut,
   Menu,
   Database,
+  Shield,
   ArrowDownToLine,
   ArrowUpFromLine,
 } from "lucide-react";
@@ -343,6 +344,17 @@ function App() {
               variant="ghost"
               size="sm"
               className="hidden gap-1 text-xs sm:inline-flex"
+              onClick={() => navigate({ to: "/admin" })}
+            >
+              <Shield className="h-3.5 w-3.5" />
+              Admin
+            </Button>
+
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="hidden gap-1 text-xs sm:inline-flex"
               onClick={signOut}
             >
               <LogOut className="h-3.5 w-3.5" />
@@ -382,6 +394,15 @@ function App() {
                   >
                     <Database className="h-4 w-4" />
                     My data
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    className="justify-start gap-2"
+                    onClick={() => navigate({ to: "/admin" })}
+                  >
+                    <Shield className="h-4 w-4" />
+                    Admin
                   </Button>
                   <Button
                     type="button"

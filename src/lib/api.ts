@@ -5,7 +5,6 @@ export const API_BASE = "https://data-collection-backend-chi.vercel.app";
 import type { Trip, VehicleType } from "@/lib/types";
 import { prepareTripsForUpload } from "@/lib/tripGps";
 
-
 const TOKEN_KEY = "transit_auth_token_v1";
 
 export type Token = {
@@ -55,11 +54,7 @@ async function fail(res: Response): Promise<never> {
   throw new ApiError(message, res.status);
 }
 
-export async function register(
-  email: string,
-  name: string,
-  password: string,
-): Promise<User> {
+export async function register(email: string, name: string, password: string): Promise<User> {
   const res = await fetch(`${API_BASE}/api/v1/auth/register`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -209,10 +204,7 @@ export function downloadTripShapefileZip(tripId: string, token: string): Promise
   );
 }
 
-export async function uploadTrips(
-  trips: Trip[],
-  token: string,
-): Promise<UploadResult> {
+export async function uploadTrips(trips: Trip[], token: string): Promise<UploadResult> {
   const { payloads, repaired, skippedStops, filled } = prepareTripsForUpload(trips);
   const form = new FormData();
   const blob = new Blob([JSON.stringify(payloads)], {
@@ -227,4 +219,253 @@ export async function uploadTrips(
   });
   if (!res.ok) await fail(res);
   return { repaired, skippedStops, filled };
+}
+
+/* ------------------------------------------------------------------ */
+/* Admin API                                                           */
+/* ------------------------------------------------------------------ */
+
+export type AdminRole = "user" | "admin" | "superadmin";
+
+export type AdminUser = {
+  id: number;
+  email: string | null;
+  name: string | null;
+  role: AdminRole;
+  unit_id: string;
+  is_active: boolean;
+};
+
+export type AdminUsersResponse = {
+  total: number;
+  users: AdminUser[];
+};
+
+export type AdminUsersQuery = {
+  search?: string;
+  role?: string;
+  is_active?: boolean;
+  offset?: number;
+  limit?: number;
+};
+
+export type AdminTrip = {
+  tripId: string;
+  unit_id: string;
+  owner_email: string | null;
+  owner_name: string | null;
+  originDestination: string;
+  date: string;
+  vehicleType: string;
+  passengerCapacity: number;
+  status: string;
+};
+
+export type AdminTripsResponse = {
+  total: number;
+  trips: AdminTrip[];
+};
+
+export type AdminTripsQuery = {
+  unit_id?: string;
+  status?: string;
+  date_from?: string;
+  date_to?: string;
+  offset?: number;
+  limit?: number;
+};
+
+export type AdminTripDetail = AdminTrip & {
+  [key: string]: unknown;
+};
+
+export type TripObservation = {
+  id?: number;
+  record_type?: string;
+  ts?: number;
+  lat?: number | null;
+  lng?: number | null;
+  [key: string]: unknown;
+};
+
+export type AdminCreateUserInput = {
+  email: string;
+  password: string;
+  name?: string | null;
+  role?: AdminRole;
+};
+
+export type AdminUpdateUserInput = {
+  name?: string | null;
+  email?: string;
+  password?: string;
+  is_active?: boolean;
+};
+
+const ADMIN_BASE = `${API_BASE}/api/v1/admin`;
+
+async function adminJson<T>(token: string, path: string, init?: RequestInit): Promise<T> {
+  const headers: Record<string, string> = { Authorization: `Bearer ${token}` };
+  if (init?.body && !(init.body instanceof FormData)) {
+    headers["Content-Type"] = "application/json";
+  }
+  const res = await fetch(`${ADMIN_BASE}${path}`, {
+    ...init,
+    headers: { ...headers, ...init?.headers },
+  });
+  if (!res.ok) await fail(res);
+  return res.json();
+}
+
+async function adminVoid(token: string, path: string, init?: RequestInit): Promise<void> {
+  const headers: Record<string, string> = { Authorization: `Bearer ${token}` };
+  if (init?.body && !(init.body instanceof FormData)) {
+    headers["Content-Type"] = "application/json";
+  }
+  const res = await fetch(`${ADMIN_BASE}${path}`, {
+    ...init,
+    headers: { ...headers, ...init?.headers },
+  });
+  if (!res.ok) await fail(res);
+}
+
+export function fetchAdminUsers(
+  token: string,
+  query: AdminUsersQuery = {},
+): Promise<AdminUsersResponse> {
+  const params = new URLSearchParams();
+  if (query.search) params.set("search", query.search);
+  if (query.role) params.set("role", query.role);
+  if (query.is_active !== undefined) params.set("is_active", String(query.is_active));
+  if (query.offset !== undefined) params.set("offset", String(query.offset));
+  if (query.limit !== undefined) params.set("limit", String(query.limit));
+  const qs = params.toString();
+  return adminJson(token, `/users${qs ? `?${qs}` : ""}`);
+}
+
+export function createAdminUser(token: string, input: AdminCreateUserInput): Promise<AdminUser> {
+  return adminJson(token, "/users", { method: "POST", body: JSON.stringify(input) });
+}
+
+export function fetchAdminUser(token: string, userId: number): Promise<AdminUser> {
+  return adminJson(token, `/users/${userId}`);
+}
+
+export function updateAdminUser(
+  token: string,
+  userId: number,
+  input: AdminUpdateUserInput,
+): Promise<AdminUser> {
+  return adminJson(token, `/users/${userId}`, {
+    method: "PATCH",
+    body: JSON.stringify(input),
+  });
+}
+
+export function deleteAdminUser(token: string, userId: number): Promise<void> {
+  return adminVoid(token, `/users/${userId}`, { method: "DELETE" });
+}
+
+export function updateAdminUserRole(
+  token: string,
+  userId: number,
+  role: AdminRole,
+): Promise<AdminUser> {
+  return adminJson(token, `/users/${userId}/role`, {
+    method: "PATCH",
+    body: JSON.stringify({ role }),
+  });
+}
+
+export function fetchAdmins(token: string): Promise<AdminUser[]> {
+  return adminJson(token, "/admins");
+}
+
+export function fetchAdminAssignedUsers(token: string, adminId: number): Promise<AdminUser[]> {
+  return adminJson(token, `/admins/${adminId}/users`);
+}
+
+export function assignUsersToAdmin(
+  token: string,
+  adminId: number,
+  userIds: number[],
+): Promise<AdminUser[]> {
+  return adminJson(token, `/admins/${adminId}/users`, {
+    method: "POST",
+    body: JSON.stringify({ user_ids: userIds }),
+  });
+}
+
+export function removeAdminAssignment(
+  token: string,
+  adminId: number,
+  userId: number,
+): Promise<void> {
+  return adminVoid(token, `/admins/${adminId}/users/${userId}`, { method: "DELETE" });
+}
+
+export function fetchAdminTrips(
+  token: string,
+  query: AdminTripsQuery = {},
+): Promise<AdminTripsResponse> {
+  const params = new URLSearchParams();
+  if (query.unit_id) params.set("unit_id", query.unit_id);
+  if (query.status) params.set("status", query.status);
+  if (query.date_from) params.set("date_from", query.date_from);
+  if (query.date_to) params.set("date_to", query.date_to);
+  if (query.offset !== undefined) params.set("offset", String(query.offset));
+  if (query.limit !== undefined) params.set("limit", String(query.limit));
+  const qs = params.toString();
+  return adminJson(token, `/trips${qs ? `?${qs}` : ""}`);
+}
+
+export function fetchAdminTripDetail(
+  token: string,
+  tripId: string,
+  unitId?: string,
+): Promise<AdminTripDetail> {
+  const params = unitId ? `?unit_id=${encodeURIComponent(unitId)}` : "";
+  return adminJson(token, `/trips/${encodeURIComponent(tripId)}${params}`);
+}
+
+export function fetchAdminTripObservations(
+  token: string,
+  tripId: string,
+  unitId?: string,
+): Promise<TripObservation[]> {
+  const params = unitId ? `?unit_id=${encodeURIComponent(unitId)}` : "";
+  return adminJson(token, `/trips/${encodeURIComponent(tripId)}/observations${params}`);
+}
+
+/** Download trip data ZIP (points.csv, stops.csv, routes.csv) scoped to the admin view. */
+export function downloadAdminTripZip(
+  token: string,
+  tripId: string,
+  unitId?: string,
+): Promise<void> {
+  const params = unitId ? `?unit_id=${encodeURIComponent(unitId)}` : "";
+  return downloadTripAttachment(
+    `/api/v1/admin/trips/${encodeURIComponent(tripId)}/download${params}`,
+    token,
+    `trip_${tripId}_admin.zip`,
+  );
+}
+
+/** Download ESRI Shapefile ZIP of GPS points scoped to the admin view. */
+export function downloadAdminTripShapefile(
+  token: string,
+  tripId: string,
+  unitId?: string,
+): Promise<void> {
+  const params = unitId ? `?unit_id=${encodeURIComponent(unitId)}` : "";
+  return downloadTripAttachment(
+    `/api/v1/admin/trips/${encodeURIComponent(tripId)}/shapefile${params}`,
+    token,
+    `trip_${tripId}_admin_shapefile.zip`,
+  );
+}
+
+/** Download all data_records (JSON) for a user, scoped to the admin view. */
+export function downloadAdminUserData(token: string, userId: number): Promise<unknown[]> {
+  return adminJson(token, `/users/${userId}/data`);
 }
