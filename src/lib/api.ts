@@ -329,7 +329,19 @@ async function adminVoid(token: string, path: string, init?: RequestInit): Promi
   if (!res.ok) await fail(res);
 }
 
-export function fetchAdminUsers(
+function normalizeAdminUsers(data: unknown): AdminUser[] {
+  if (Array.isArray(data)) return data as AdminUser[];
+  if (data && typeof data === "object") {
+    const d = data as Record<string, unknown>;
+    if (Array.isArray(d.admins)) return d.admins as AdminUser[];
+    if (Array.isArray(d.users)) return d.users as AdminUser[];
+    if (Array.isArray(d.items)) return d.items as AdminUser[];
+    if (Array.isArray(d.data)) return d.data as AdminUser[];
+  }
+  return [];
+}
+
+export async function fetchAdminUsers(
   token: string,
   query: AdminUsersQuery = {},
 ): Promise<AdminUsersResponse> {
@@ -340,7 +352,15 @@ export function fetchAdminUsers(
   if (query.offset !== undefined) params.set("offset", String(query.offset));
   if (query.limit !== undefined) params.set("limit", String(query.limit));
   const qs = params.toString();
-  return adminJson(token, `/users${qs ? `?${qs}` : ""}`);
+  const data = await adminJson<unknown>(token, `/users${qs ? `?${qs}` : ""}`);
+  if (Array.isArray(data)) {
+    return { total: data.length, users: data as AdminUser[] };
+  }
+  const d = (data ?? {}) as Partial<AdminUsersResponse>;
+  return {
+    total: typeof d.total === "number" ? d.total : Array.isArray(d.users) ? d.users.length : 0,
+    users: Array.isArray(d.users) ? d.users : [],
+  };
 }
 
 export function createAdminUser(token: string, input: AdminCreateUserInput): Promise<AdminUser> {
@@ -377,12 +397,15 @@ export function updateAdminUserRole(
   });
 }
 
-export function fetchAdmins(token: string): Promise<AdminUser[]> {
-  return adminJson(token, "/admins");
+export async function fetchAdmins(token: string): Promise<AdminUser[]> {
+  return normalizeAdminUsers(await adminJson<unknown>(token, "/admins"));
 }
 
-export function fetchAdminAssignedUsers(token: string, adminId: number): Promise<AdminUser[]> {
-  return adminJson(token, `/admins/${adminId}/users`);
+export async function fetchAdminAssignedUsers(
+  token: string,
+  adminId: number,
+): Promise<AdminUser[]> {
+  return normalizeAdminUsers(await adminJson<unknown>(token, `/admins/${adminId}/users`));
 }
 
 export function assignUsersToAdmin(

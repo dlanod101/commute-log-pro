@@ -50,9 +50,10 @@ export function AdminAdminsTab({ onSessionExpired }: Props) {
     fetchAdmins(tok)
       .then(async (list) => {
         if (cancelled) return;
-        setAdmins(list);
+        const adminsList = Array.isArray(list) ? list : [];
+        setAdmins(adminsList);
         const entries = await Promise.all(
-          list.map(async (a) => {
+          adminsList.map(async (a) => {
             try {
               const users = await fetchAdminAssignedUsers(tok, a.id);
               return [a.id, Array.isArray(users) ? users : []] as const;
