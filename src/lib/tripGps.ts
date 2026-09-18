@@ -103,7 +103,7 @@ export function prepareTripForUpload(trip: Trip): PreparedTrip {
   const gps = normalizeGpsPoints(repaired.gps);
   const tripWithGps = { ...repaired, gps, stops };
   const { uploaded: _uploaded, vehicle, routeType, ...rest } = tripWithGps;
-  const trimmedRouteType = routeType?.trim();
+  const trimmedRouteType = typeof routeType === "string" ? routeType.trim() : "";
   const skippedStops = repaired.stops.length - stops.length;
   return {
     payload: {

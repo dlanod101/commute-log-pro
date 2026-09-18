@@ -88,11 +88,14 @@ export function usePwa() {
       void reg.update().catch(() => {});
     };
 
-    void registerServiceWorker();
+    // Registration/update can reject when the script can't be fetched (e.g. a
+    // flaky network or a deploy in progress). Swallow it so it doesn't surface
+    // as an uncaught promise rejection in the console.
+    void registerServiceWorker().catch(() => {});
 
     const updateInterval = setInterval(
       () => {
-        void navigator.serviceWorker?.ready.then((reg) => reg.update());
+        void navigator.serviceWorker?.ready.then((reg) => reg.update()).catch(() => {});
       },
       import.meta.env.DEV ? 30_000 : 15 * 60 * 1000,
     );
