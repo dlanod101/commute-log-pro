@@ -18,14 +18,6 @@ export type VehicleType = {
   active?: boolean;
 };
 
-/** Route operation type: whether a vehicle runs a fixed route or on demand. */
-export type RouteType = {
-  id: string;
-  code: string;
-  name: string;
-  active?: boolean;
-};
-
 export type Stop = {
   id: string;
   ts: number;
@@ -47,7 +39,8 @@ export type Trip = {
   destination: string;
   fare: number | null;
   vehicle?: VehicleType;
-  routeType?: RouteType;
+  /** Free-text route type typed by the operator (e.g. "Fixed-Route" or "Charter Service"). */
+  routeType?: string;
   initialPassengers: number;
   startedAt: number;
   endedAt?: number;

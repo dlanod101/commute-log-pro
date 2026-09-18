@@ -85,7 +85,8 @@ export type PreparedTrip = {
   payload: Omit<Trip, "uploaded" | "vehicle" | "routeType"> & {
     vehicleType?: string;
     passengerCapacity?: number;
-    routeType?: string;
+    /** Free-text route type, trimmed; `null` when the operator left it blank. */
+    routeType?: string | null;
     status: "ongoing" | "completed";
   };
   repaired: Trip;
@@ -102,6 +103,7 @@ export function prepareTripForUpload(trip: Trip): PreparedTrip {
   const gps = normalizeGpsPoints(repaired.gps);
   const tripWithGps = { ...repaired, gps, stops };
   const { uploaded: _uploaded, vehicle, routeType, ...rest } = tripWithGps;
+  const trimmedRouteType = routeType?.trim();
   const skippedStops = repaired.stops.length - stops.length;
   return {
     payload: {
@@ -109,7 +111,7 @@ export function prepareTripForUpload(trip: Trip): PreparedTrip {
       status: tripWithGps.endedAt ? "completed" : "ongoing",
       vehicleType: vehicle?.code,
       passengerCapacity: vehicle?.capacity,
-      routeType: routeType?.code,
+      routeType: trimmedRouteType ? trimmedRouteType : null,
       stops,
     },
     repaired: tripWithGps,

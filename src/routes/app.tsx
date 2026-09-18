@@ -4,7 +4,6 @@ import { requireAuth } from "@/lib/auth-guard";
 import {
   ApiError,
   fetchAdminUsers,
-  fetchRouteTypes,
   getMe,
   loadToken,
   saveToken,
@@ -17,13 +16,6 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import {
   Dialog,
   DialogContent,
@@ -65,7 +57,7 @@ import { useGps } from "@/hooks/use-gps";
 import { useOnline } from "@/hooks/use-online";
 import { loadActive, loadTrips, saveActive, saveTrips } from "@/lib/storage";
 import { appendGpsPoint, GPS_SAMPLE_INTERVAL_MS } from "@/lib/tripGps";
-import type { RouteType, Stop, StopType, Trip, VehicleType } from "@/lib/types";
+import type { Stop, StopType, Trip, VehicleType } from "@/lib/types";
 import { TripStatBadge } from "@/components/TripStatBadge";
 import { MyDataSheet } from "@/components/MyDataSheet";
 
@@ -75,12 +67,6 @@ export const Route = createFileRoute("/app")({
 });
 
 const uid = () => Math.random().toString(36).slice(2, 10);
-
-/** Route operation types shown on the start page; refreshed from the API when online. */
-const DEFAULT_ROUTE_TYPES: RouteType[] = [
-  { id: "fixed_route", code: "fixed_route", name: "Fixed-Route", active: true },
-  { id: "demand_responsive", code: "demand_responsive", name: "Demand-Responsive", active: true },
-];
 
 function fmtDuration(ms: number) {
   const s = Math.floor(ms / 1000);
@@ -101,7 +87,6 @@ function App() {
   const [now, setNow] = useState(Date.now());
   const online = useOnline();
   const [user, setUser] = useState<User | null>(null);
-  const [routeTypes, setRouteTypes] = useState<RouteType[]>(DEFAULT_ROUTE_TYPES);
   const [uploading, setUploading] = useState(false);
   const [myDataOpen, setMyDataOpen] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
@@ -133,13 +118,6 @@ function App() {
             navigate({ to: "/" });
           }
         });
-      // Drive the route-type picker from the server; keep the built-in defaults
-      // when offline or the request fails.
-      fetchRouteTypes(token)
-        .then((list) => {
-          if (list.length) setRouteTypes(list);
-        })
-        .catch(() => {});
     }
   }, [navigate]);
 
@@ -199,7 +177,7 @@ function App() {
     destination: string;
     initialPassengers: number;
     vehicle?: VehicleType;
-    routeType?: RouteType;
+    routeType?: string;
   }) => {
     const trip: Trip = {
       id: uid(),
@@ -504,7 +482,7 @@ function App() {
               </TabsTrigger>
             </TabsList>
             <TabsContent value="start" className="mt-4">
-              <NewTripForm routeTypes={routeTypes} onStart={startTrip} />
+              <NewTripForm onStart={startTrip} />
             </TabsContent>
             <TabsContent value="history" className="mt-4 space-y-3">
               {user && (
@@ -543,16 +521,14 @@ function App() {
 
 // ========== NEW TRIP FORM (no fare) ==========
 function NewTripForm({
-  routeTypes,
   onStart,
 }: {
-  routeTypes: RouteType[];
   onStart: (d: {
     origin: string;
     destination: string;
     initialPassengers: number;
     vehicle?: VehicleType;
-    routeType?: RouteType;
+    routeType?: string;
   }) => void;
 }) {
   const [origin, setOrigin] = useState("");
@@ -560,7 +536,7 @@ function NewTripForm({
   const [pax, setPax] = useState("");
   const [vehicleName, setVehicleName] = useState("");
   const [vehicleCapacity, setVehicleCapacity] = useState("");
-  const [routeTypeCode, setRouteTypeCode] = useState("");
+  const [routeType, setRouteType] = useState("");
 
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -577,14 +553,12 @@ function NewTripForm({
             capacity: Math.max(0, parseInt(vehicleCapacity) || 0),
           }
         : undefined;
-    const routeType: RouteType | undefined =
-      routeTypeCode !== "" ? routeTypes.find((rt) => rt.code === routeTypeCode) : undefined;
     onStart({
       origin: origin.trim().slice(0, 80),
       destination: destination.trim().slice(0, 80),
       initialPassengers: Math.max(0, parseInt(pax) || 0),
       vehicle,
-      routeType,
+      routeType: routeType.trim() || undefined,
     });
   };
 
@@ -620,24 +594,14 @@ function NewTripForm({
         </div>
         <div className="space-y-2">
           <Label>Route type</Label>
-          <Select
-            value={routeTypeCode || undefined}
-            onValueChange={(v) => setRouteTypeCode(v === "none" ? "" : v)}
-          >
-            <SelectTrigger className="w-full">
-              <SelectValue placeholder="Not specified" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="none">Not specified</SelectItem>
-              {routeTypes.map((rt) => (
-                <SelectItem key={rt.code} value={rt.code}>
-                  {rt.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <Input
+            value={routeType}
+            onChange={(e) => setRouteType(e.target.value)}
+            maxLength={80}
+            placeholder="e.g. Fixed-Route"
+          />
           <p className="text-xs text-muted-foreground">
-            Fixed route or on-demand service — separate from vehicle type.
+            Optional free text (e.g. Fixed-Route, Charter Service) — separate from vehicle type.
           </p>
         </div>
         <div className="space-y-2">
@@ -717,7 +681,7 @@ function ActiveTripView({
         {trip.routeType ? (
           <div className="mt-3 flex w-fit items-center gap-1.5 rounded-full border border-white/20 bg-white/10 px-3 py-1 text-xs text-white">
             <RouteIcon className="h-3.5 w-3.5 text-accent" />
-            {trip.routeType.name || trip.routeType.code}
+            {trip.routeType}
           </div>
         ) : null}
         {trip.vehicle ? (
@@ -1073,7 +1037,7 @@ function TripCard({ trip, onDelete }: { trip: Trip; onDelete: () => void }) {
           {trip.routeType && (
             <p className="mt-1 inline-flex items-center gap-1 text-[11px] font-medium text-muted-foreground">
               <RouteIcon className="h-3 w-3 text-accent" />
-              {trip.routeType.name || trip.routeType.code}
+              {trip.routeType}
             </p>
           )}
         </div>

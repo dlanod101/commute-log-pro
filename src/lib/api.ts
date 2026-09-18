@@ -1,4 +1,4 @@
-import type { RouteType, Trip, VehicleType } from "@/lib/types";
+import type { Trip, VehicleType } from "@/lib/types";
 import { prepareTripsForUpload } from "@/lib/tripGps";
 
 export const API_BASE = "https://data-collection-backend-chi.vercel.app";
@@ -120,23 +120,6 @@ export async function fetchVehicleTypes(token: string): Promise<VehicleType[]> {
     id: String(item.id),
     code: String(item.code),
   })) as VehicleType[];
-}
-
-/** Fetch route operation types (Fixed-Route / Demand-Responsive). */
-export async function fetchRouteTypes(token: string): Promise<RouteType[]> {
-  const res = await fetch(`${API_BASE}/api/v1/data/route-types`, {
-    headers: { Authorization: `Bearer ${token}` },
-  });
-  if (!res.ok) await fail(res);
-  const data = await res.json();
-  return (Array.isArray(data) ? data : [])
-    .filter((item) => item && typeof item.code === "string" && item.code !== "")
-    .map((item) => ({
-      ...item,
-      id: String(item.id),
-      code: String(item.code),
-      name: String(item.name ?? item.code),
-    })) as RouteType[];
 }
 
 export type EndTripResult = {
