@@ -12,6 +12,7 @@ export function usePwa() {
   const [canInstall, setCanInstall] = useState(false);
   const [updateAvailable, setUpdateAvailable] = useState(false);
   const [installed, setInstalled] = useState(false);
+  const [ready, setReady] = useState(false);
 
   const installPromptRef = useRef<BeforeInstallPromptEvent | null>(null);
   const waitingWorkerRef = useRef<ServiceWorker | null>(null);
@@ -28,6 +29,7 @@ export function usePwa() {
     if (typeof window === "undefined") return;
 
     setInstalled(isStandalone());
+    setReady(true);
 
     const onBeforeInstall = (e: BeforeInstallPromptEvent) => {
       e.preventDefault();
@@ -48,8 +50,6 @@ export function usePwa() {
     window.addEventListener("beforeinstallprompt", onBeforeInstall);
     window.addEventListener("appinstalled", onInstalled);
     navigator.serviceWorker?.addEventListener("controllerchange", onControllerChange);
-
-    let updateInterval: ReturnType<typeof setInterval> | undefined;
 
     const registerServiceWorker = async () => {
       if (!("serviceWorker" in navigator)) return;
@@ -90,7 +90,7 @@ export function usePwa() {
 
     void registerServiceWorker();
 
-    updateInterval = setInterval(
+    const updateInterval = setInterval(
       () => {
         void navigator.serviceWorker?.ready.then((reg) => reg.update());
       },
@@ -101,20 +101,21 @@ export function usePwa() {
       window.removeEventListener("beforeinstallprompt", onBeforeInstall);
       window.removeEventListener("appinstalled", onInstalled);
       navigator.serviceWorker?.removeEventListener("controllerchange", onControllerChange);
-      if (updateInterval) clearInterval(updateInterval);
+      clearInterval(updateInterval);
     };
   }, [markWaitingWorker]);
 
   const install = useCallback(async () => {
     const prompt = installPromptRef.current;
-    if (!prompt) return;
+    if (!prompt) return false;
     await prompt.prompt();
     const { outcome } = await prompt.userChoice;
     installPromptRef.current = null;
-    if (outcome === "accepted") {
-      setCanInstall(false);
-      setInstalled(true);
-    }
+    // The deferred prompt is one-shot: clear the flag so any later tap falls
+    // back to the manual install instructions.
+    setCanInstall(false);
+    if (outcome === "accepted") setInstalled(true);
+    return true;
   }, []);
 
   const applyUpdate = useCallback(() => {
@@ -130,6 +131,8 @@ export function usePwa() {
 
   return {
     canInstall: canInstall && !installed,
+    installed,
+    ready,
     updateAvailable,
     install,
     applyUpdate,
