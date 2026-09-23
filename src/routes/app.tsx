@@ -1025,8 +1025,16 @@ function StopObservationsList({ stops }: { stops: Stop[] }) {
                   </div>
                   <div className="mt-1 font-semibold">{new Date(stop.ts).toLocaleTimeString()}</div>
                 </div>
-                <div className="text-sm text-muted-foreground">
-                  {stop.type === "signalized" ? "Signal stop entry" : "Regular stop entry"}
+                <div className="text-sm text-muted-foreground sm:text-right">
+                  <div>
+                    {stop.type === "signalized" ? "Signal stop entry" : "Regular stop entry"}
+                  </div>
+                  {stop.dwellSeconds != null && (
+                    <div className="mt-0.5 font-mono text-xs text-foreground">
+                      {fmtDuration(stop.dwellSeconds * 1000)} dwell
+                      {stop.delaySeconds != null ? ` · ${stop.delaySeconds}s delay` : ""}
+                    </div>
+                  )}
                 </div>
               </div>
               <p className="mt-3 text-sm leading-6 text-foreground">{stop.notes}</p>
