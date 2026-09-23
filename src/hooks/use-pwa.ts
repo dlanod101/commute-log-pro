@@ -8,6 +8,29 @@ function isStandalone(): boolean {
   );
 }
 
+/**
+ * Version stamped into the deployed service worker by `scripts/stamp-sw.mjs`.
+ * It changes on every deploy, so a difference means a new release is live.
+ */
+const SW_VERSION_PATTERN = /SW_VERSION\s*=\s*"([^"]+)"/;
+
+/**
+ * Read the version of the service worker the server is serving right now.
+ *
+ * `no-store` plus a cache-busting query is deliberate: the browser (and any
+ * CDN) will happily hand back a stale copy of /sw.js, which is the usual reason
+ * a PWA never notices a new deployment.
+ */
+async function fetchDeployedSwVersion(): Promise<string | null> {
+  try {
+    const res = await fetch(`/sw.js?ts=${Date.now()}`, { cache: "no-store" });
+    if (!res.ok) return null;
+    return (await res.text()).match(SW_VERSION_PATTERN)?.[1] ?? null;
+  } catch {
+    return null;
+  }
+}
+
 export function usePwa() {
   const [canInstall, setCanInstall] = useState(false);
   const [updateAvailable, setUpdateAvailable] = useState(false);
@@ -16,7 +39,6 @@ export function usePwa() {
 
   const installPromptRef = useRef<BeforeInstallPromptEvent | null>(null);
   const waitingWorkerRef = useRef<ServiceWorker | null>(null);
-  const registrationRef = useRef<ServiceWorkerRegistration | null>(null);
 
   const markWaitingWorker = useCallback((reg: ServiceWorkerRegistration) => {
     if (reg.waiting) {
@@ -59,8 +81,12 @@ export function usePwa() {
         await Promise.all(stale.map((reg) => reg.unregister()));
       }
 
-      const reg = await navigator.serviceWorker.register("/sw.js", { scope: "/" });
-      registrationRef.current = reg;
+      const reg = await navigator.serviceWorker.register("/sw.js", {
+        scope: "/",
+        // Never let the HTTP cache satisfy the update check for /sw.js — a
+        // cached script means a release can silently go unnoticed.
+        updateViaCache: "none",
+      });
 
       // An update can already be installing/waiting by the time register()
       // resolves (the updatefound event may have already fired), so cover that
@@ -93,17 +119,45 @@ export function usePwa() {
     // as an uncaught promise rejection in the console.
     void registerServiceWorker().catch(() => {});
 
+    // Two independent detection paths:
+    //  1. the service-worker update check (fires `updatefound`), and
+    //  2. reading the deployed /sw.js directly with `no-store`.
+    // Path 2 is essential: browsers routinely serve a cached copy of /sw.js, so
+    // path 1 never sees the new release and the popup would never show.
+    let runVersion: string | null = null;
+
+    const checkForUpdate = async () => {
+      try {
+        await navigator.serviceWorker?.ready.then((reg) => reg.update());
+      } catch {
+        /* offline, or a deploy in flight — the next tick retries */
+      }
+
+      const deployed = await fetchDeployedSwVersion();
+      if (!deployed) return;
+      if (runVersion === null) {
+        // First successful read = the release this page is running.
+        runVersion = deployed;
+        return;
+      }
+      if (deployed !== runVersion) setUpdateAvailable(true);
+    };
+
+    void checkForUpdate();
     const updateInterval = setInterval(
-      () => {
-        void navigator.serviceWorker?.ready.then((reg) => reg.update()).catch(() => {});
-      },
-      import.meta.env.DEV ? 30_000 : 15 * 60 * 1000,
+      () => void checkForUpdate(),
+      import.meta.env.DEV ? 15_000 : 5 * 60 * 1000,
     );
+    const onVisible = () => {
+      if (document.visibilityState === "visible") void checkForUpdate();
+    };
+    document.addEventListener("visibilitychange", onVisible);
 
     return () => {
       window.removeEventListener("beforeinstallprompt", onBeforeInstall);
       window.removeEventListener("appinstalled", onInstalled);
       navigator.serviceWorker?.removeEventListener("controllerchange", onControllerChange);
+      document.removeEventListener("visibilitychange", onVisible);
       clearInterval(updateInterval);
     };
   }, [markWaitingWorker]);
@@ -123,14 +177,25 @@ export function usePwa() {
 
   const applyUpdate = useCallback(() => {
     const waiting = waitingWorkerRef.current;
-    if (waiting) {
-      waiting.postMessage({ type: "SKIP_WAITING" });
+    if (!waiting) {
+      // Nothing staged yet — a reload is still enough, because the service
+      // worker serves the app shell network-first.
+      window.location.reload();
       return;
     }
-    void registrationRef.current?.update().then(() => {
-      if (registrationRef.current) markWaitingWorker(registrationRef.current);
-    });
-  }, [markWaitingWorker]);
+
+    // Ask the new worker to activate, then reload once it takes control. The
+    // timeout covers the case where `controllerchange` never fires.
+    let reloaded = false;
+    const reload = () => {
+      if (reloaded) return;
+      reloaded = true;
+      window.location.reload();
+    };
+    navigator.serviceWorker.addEventListener("controllerchange", reload, { once: true });
+    waiting.postMessage({ type: "SKIP_WAITING" });
+    window.setTimeout(reload, 2000);
+  }, []);
 
   return {
     canInstall: canInstall && !installed,
