@@ -810,7 +810,7 @@ function ActiveTripView({
   );
 }
 
-// ========== STOP DIALOG (regular stops only, fare on end) ==========
+// ========== STOP DIALOG (dwell measured on every stop; fare on end) ==========
 function StopDialog({
   open,
   onOpenChange,
@@ -831,6 +831,7 @@ function StopDialog({
   const [board, setBoard] = useState("0");
   const [alight, setAlight] = useState("0");
   const [notes, setNotes] = useState("");
+  const [delay, setDelay] = useState("");
   const [dwellStart, setDwellStart] = useState<number | null>(null);
   const [dwellPaused, setDwellPaused] = useState<number>(0);
   const [tick, setTick] = useState(0);
@@ -841,11 +842,13 @@ function StopDialog({
       setBoard("0");
       setAlight("0");
       setNotes("");
-      setDwellStart(stopType === "signalized" ? Date.now() : null);
+      setDelay("");
+      // Dwell is measured for every stop visit, not just signal stops.
+      setDwellStart(Date.now());
       setDwellPaused(0);
       setFare("");
     }
-  }, [open, stopType]);
+  }, [open]);
 
   useEffect(() => {
     if (!open || dwellStart === null) return;
@@ -864,39 +867,37 @@ function StopDialog({
           <DialogTitle>{title}</DialogTitle>
         </DialogHeader>
         <div className="space-y-4">
-          {stopType === "signalized" && (
-            <div className="rounded-lg border bg-secondary/40 p-3">
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                <div>
-                  <div className="text-[10px] uppercase tracking-widest text-muted-foreground">
-                    Signal Stop time
-                  </div>
-                  <div className="font-mono text-xl font-semibold tabular-nums sm:text-2xl">
-                    {fmtDuration(dwellMs)}
-                  </div>
+          <div className="rounded-lg border bg-secondary/40 p-3">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <div className="text-[10px] uppercase tracking-widest text-muted-foreground">
+                  Dwell time
                 </div>
-                <Button
-                  type="button"
-                  size="sm"
-                  className="w-full shrink-0 sm:w-auto"
-                  variant={dwellStart === null ? "default" : "outline"}
-                  onClick={() => {
-                    if (dwellStart === null) {
-                      setDwellStart(Date.now());
-                    } else {
-                      setDwellPaused(dwellPaused + (Date.now() - dwellStart));
-                      setDwellStart(null);
-                    }
-                  }}
-                >
-                  {dwellStart === null ? "Resume" : "Stop timer"}
-                </Button>
+                <div className="font-mono text-xl font-semibold tabular-nums sm:text-2xl">
+                  {fmtDuration(dwellMs)}
+                </div>
               </div>
-              <p className="mt-2 text-xs text-muted-foreground">
-                Auto-started when stop logged. Stop the timer when the vehicle moves.
-              </p>
+              <Button
+                type="button"
+                size="sm"
+                className="w-full shrink-0 sm:w-auto"
+                variant={dwellStart === null ? "default" : "outline"}
+                onClick={() => {
+                  if (dwellStart === null) {
+                    setDwellStart(Date.now());
+                  } else {
+                    setDwellPaused(dwellPaused + (Date.now() - dwellStart));
+                    setDwellStart(null);
+                  }
+                }}
+              >
+                {dwellStart === null ? "Resume" : "Stop timer"}
+              </Button>
             </div>
-          )}
+            <p className="mt-2 text-xs text-muted-foreground">
+              Time stopped at this stop. Auto-started — pause it when the vehicle moves.
+            </p>
+          </div>
 
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-2">
@@ -911,6 +912,19 @@ function StopDialog({
                 onChange={(e) => setAlight(e.target.value)}
               />
             </div>
+          </div>
+
+          <div className="space-y-2">
+            <Label>Delay time (seconds)</Label>
+            <Input
+              inputMode="decimal"
+              value={delay}
+              onChange={(e) => setDelay(e.target.value)}
+              placeholder="Optional"
+            />
+            <p className="text-xs text-muted-foreground">
+              Extra delay at this stop. Recorded separately from dwell time.
+            </p>
           </div>
 
           <div className="space-y-2">
@@ -951,10 +965,18 @@ function StopDialog({
                 toast.error("A valid total fare is required to end the trip.");
                 return;
               }
+              // Unknown delay is omitted (never sent as 0, which would skew averages).
+              const delayValue = Number(delay);
+              const delaySeconds =
+                delay.trim() !== "" && Number.isFinite(delayValue) && delayValue >= 0
+                  ? delayValue
+                  : undefined;
               onSubmit(
                 {
                   type: stopType,
-                  dwellSeconds: stopType === "signalized" ? dwellSec : undefined,
+                  // Dwell is captured for every stop visit — signal and regular alike.
+                  dwellSeconds: dwellSec,
+                  delaySeconds,
                   boarding: Math.max(0, parseInt(board) || 0),
                   alighting: Math.max(0, parseInt(alight) || 0),
                   notes: notes.trim() || undefined,

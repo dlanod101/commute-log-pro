@@ -81,18 +81,39 @@ export function backfillTripStops(trip: Trip): {
   return { trip: { ...trip, stops }, filled, stillMissing };
 }
 
+/** A stop as serialised for `POST /api/v1/data/upload`. */
+export type StopPayload = Record<string, unknown>;
+
 export type PreparedTrip = {
-  payload: Omit<Trip, "uploaded" | "vehicle" | "routeType"> & {
+  payload: Omit<Trip, "uploaded" | "vehicle" | "routeType" | "stops"> & {
     vehicleType?: string;
     passengerCapacity?: number;
     /** Free-text route type, trimmed; `null` when the operator left it blank. */
     routeType?: string | null;
     status: "ongoing" | "completed";
+    /** Stops shaped for the upload contract. */
+    stops: StopPayload[];
   };
   repaired: Trip;
   skippedStops: number;
   filled: number;
 };
+
+/**
+ * Shape a stop for upload.
+ *
+ * - `signalDelay` is accepted by the API but never persisted (the server derives
+ *   signal stop time from `dwellSeconds`), so it is dropped here.
+ * - Unknown `dwellSeconds` / `delaySeconds` are omitted rather than sent as `0`,
+ *   which would skew the server-side `averageDwellSeconds`.
+ */
+function stopForUpload(stop: Stop): StopPayload {
+  const { signalDelay: _signalDelay, ...rest } = stop as Stop & { signalDelay?: unknown };
+  const payload: StopPayload = { ...rest };
+  if (!Number.isFinite(payload.dwellSeconds)) delete payload.dwellSeconds;
+  if (!Number.isFinite(payload.delaySeconds)) delete payload.delaySeconds;
+  return payload;
+}
 
 export function prepareTripForUpload(trip: Trip): PreparedTrip {
   const { trip: repaired, filled } = backfillTripStops(trip);
@@ -112,7 +133,7 @@ export function prepareTripForUpload(trip: Trip): PreparedTrip {
       vehicleType: vehicle?.code,
       passengerCapacity: vehicle?.capacity,
       routeType: trimmedRouteType ? trimmedRouteType : null,
-      stops,
+      stops: stops.map(stopForUpload),
     },
     repaired: tripWithGps,
     skippedStops,

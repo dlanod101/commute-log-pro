@@ -8,7 +8,6 @@ export type GpsPoint = {
 };
 
 export type StopType = "regular" | "signalized";
-export type SignalDelay = "none" | "short" | "long";
 
 export type VehicleType = {
   id: string;
@@ -24,10 +23,11 @@ export type Stop = {
   lat: number | null;
   lng: number | null;
   type: StopType;
-  signalDelay?: SignalDelay;
   boarding: number;
   alighting: number;
+  /** Time spent stopped at this stop visit, in seconds. Sent for every stop type. */
   dwellSeconds?: number;
+  /** Independent "Delay Time" for this stop visit, in seconds. */
   delaySeconds?: number;
   intersectionName?: string;
   notes?: string;
