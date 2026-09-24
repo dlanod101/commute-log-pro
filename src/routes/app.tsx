@@ -799,7 +799,8 @@ function ActiveTripView({
         title="End trip at stop"
         submitLabel="End trip"
         destructive
-        stopType="signalized"
+        stopType="regular"
+        showStopTypePicker
         onSubmit={(d, fare) => {
           onEnd(d, fare);
           setEndOpen(false);
@@ -818,6 +819,7 @@ function StopDialog({
   submitLabel,
   destructive,
   stopType,
+  showStopTypePicker,
   onSubmit,
 }: {
   open: boolean;
@@ -826,6 +828,8 @@ function StopDialog({
   submitLabel: string;
   destructive?: boolean;
   stopType: StopType;
+  /** When true, the driver can switch between Regular and Signal (defaults to `stopType`). */
+  showStopTypePicker?: boolean;
   onSubmit: (s: Omit<Stop, "id" | "ts" | "lat" | "lng">, fare?: number) => void;
 }) {
   const [board, setBoard] = useState("0");
@@ -836,6 +840,7 @@ function StopDialog({
   const [dwellPaused, setDwellPaused] = useState<number>(0);
   const [tick, setTick] = useState(0);
   const [fare, setFare] = useState("");
+  const [chosenType, setChosenType] = useState<StopType>(stopType);
 
   useEffect(() => {
     if (open) {
@@ -847,8 +852,9 @@ function StopDialog({
       setDwellStart(Date.now());
       setDwellPaused(0);
       setFare("");
+      setChosenType(stopType);
     }
-  }, [open]);
+  }, [open, stopType]);
 
   useEffect(() => {
     if (!open || dwellStart === null) return;
@@ -938,6 +944,33 @@ function StopDialog({
             />
           </div>
 
+          {showStopTypePicker && (
+            <div className="space-y-2">
+              <Label>Stop type</Label>
+              <div className="grid grid-cols-2 gap-2">
+                <Button
+                  type="button"
+                  variant={chosenType === "regular" ? "default" : "outline"}
+                  className="w-full"
+                  onClick={() => setChosenType("regular")}
+                >
+                  Regular
+                </Button>
+                <Button
+                  type="button"
+                  variant={chosenType === "signalized" ? "default" : "outline"}
+                  className="w-full"
+                  onClick={() => setChosenType("signalized")}
+                >
+                  Signal
+                </Button>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Defaults to Regular. Choose Signal only if this stop is at a traffic signal.
+              </p>
+            </div>
+          )}
+
           {destructive && (
             <div className="space-y-2">
               <Label>Total fare (₦) *</Label>
@@ -973,7 +1006,7 @@ function StopDialog({
                   : undefined;
               onSubmit(
                 {
-                  type: stopType,
+                  type: chosenType,
                   // Dwell is captured for every stop visit — signal and regular alike.
                   dwellSeconds: dwellSec,
                   delaySeconds,
