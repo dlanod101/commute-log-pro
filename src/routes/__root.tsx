@@ -4,6 +4,14 @@ import appCss from "../styles.css?url";
 import { PwaFloatingActions } from "@/components/PwaFloatingActions";
 import { UpdatePopup } from "@/components/UpdatePopup";
 
+/**
+ * Runs before React hydrates. Chrome can fire `beforeinstallprompt` while the
+ * page is still loading, and a listener attached later in a `useEffect` misses
+ * it — the install button would then only ever fall back to manual
+ * instructions. `usePwa()` consumes the stashed event on mount.
+ */
+const INSTALL_PROMPT_BOOTSTRAP = `window.addEventListener("beforeinstallprompt", function (event) { event.preventDefault(); window.__deferredInstallPrompt = event; });`;
+
 function NotFoundComponent() {
   return (
     <div className="flex min-h-screen items-center justify-center bg-background px-4">
@@ -65,8 +73,8 @@ export const Route = createRootRoute({
         href: appCss,
       },
       { rel: "manifest", href: "/manifest.webmanifest" },
-      { rel: "icon", href: "/logo.png", type: "image/png" },
-      { rel: "apple-touch-icon", href: "/logo.png" },
+      { rel: "icon", href: "/pwa-192x192.png", type: "image/png", sizes: "192x192" },
+      { rel: "apple-touch-icon", href: "/apple-touch-icon.png", sizes: "180x180" },
     ],
   }),
   shellComponent: RootShell,
@@ -79,6 +87,7 @@ function RootShell({ children }: { children: React.ReactNode }) {
     <html lang="en">
       <head>
         <HeadContent />
+        <script dangerouslySetInnerHTML={{ __html: INSTALL_PROMPT_BOOTSTRAP }} />
       </head>
       <body>
         {children}

@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { ArrowUpFromLine, Download, Menu } from "lucide-react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -13,6 +14,17 @@ import { usePwa } from "@/hooks/use-pwa";
 export function PwaFloatingActions() {
   const { canInstall, installed, ready, install } = usePwa();
   const [helpOpen, setHelpOpen] = useState(false);
+
+  // `appinstalled` only fires for a real installation, so this can't be
+  // confused with launching the app from the home screen.
+  useEffect(() => {
+    const onInstalled = () => {
+      setHelpOpen(false);
+      toast.success("DeyGo installed — open it from your home screen");
+    };
+    window.addEventListener("appinstalled", onInstalled);
+    return () => window.removeEventListener("appinstalled", onInstalled);
+  }, []);
 
   // Keep the button visible for anyone who hasn't installed the app yet — not
   // just when the browser exposes a `beforeinstallprompt` event. Browsers such

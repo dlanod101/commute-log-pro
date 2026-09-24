@@ -1,7 +1,15 @@
 const SW_VERSION = "__SW_VERSION__";
 const CACHE = `t-data-${SW_VERSION}`;
 const OFFLINE_URL = "/app";
-const PRECACHE = ["/logo.png", "/manifest.webmanifest"];
+const PRECACHE = [
+  "/logo.png",
+  "/manifest.webmanifest",
+  // Installability: Chrome fetches the manifest icons when it decides whether
+  // the app can be installed, so keep them available offline too.
+  "/pwa-192x192.png",
+  "/maskable-512x512.png",
+  "/apple-touch-icon.png",
+];
 
 function isLocalDev() {
   const host = self.location.hostname;

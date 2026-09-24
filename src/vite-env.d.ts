@@ -8,3 +8,11 @@ interface BeforeInstallPromptEvent extends Event {
 interface WindowEventMap {
   beforeinstallprompt: BeforeInstallPromptEvent;
 }
+
+interface Window {
+  /**
+   * `beforeinstallprompt` event captured by the bootstrap script in
+   * `src/routes/__root.tsx` before React hydrated. `usePwa()` consumes it.
+   */
+  __deferredInstallPrompt?: BeforeInstallPromptEvent;
+}

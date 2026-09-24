@@ -9,6 +9,22 @@ function isStandalone(): boolean {
 }
 
 /**
+ * Recover a `beforeinstallprompt` event that fired before React hydrated.
+ *
+ * The root layout installs a tiny inline listener for that (Chrome can fire the
+ * event while the page is still loading), which is the only reliable way to
+ * catch it. Without this the install button would never see a real prompt and
+ * would only ever show the manual "add to home screen" instructions.
+ */
+function takeBootstrappedPrompt(): BeforeInstallPromptEvent | null {
+  if (typeof window === "undefined") return null;
+  const event = window.__deferredInstallPrompt ?? null;
+  // One-shot: the same event can only be prompted once.
+  delete window.__deferredInstallPrompt;
+  return event;
+}
+
+/**
  * Version stamped into the deployed service worker by `scripts/stamp-sw.mjs`.
  * It changes on every deploy, so a difference means a new release is live.
  */
@@ -52,6 +68,14 @@ export function usePwa() {
 
     setInstalled(isStandalone());
     setReady(true);
+
+    // A prompt fired before hydration is still usable — pick it up now so the
+    // button installs natively instead of showing instructions.
+    const bootstrapped = takeBootstrappedPrompt();
+    if (bootstrapped && !isStandalone()) {
+      installPromptRef.current = bootstrapped;
+      setCanInstall(true);
+    }
 
     const onBeforeInstall = (e: BeforeInstallPromptEvent) => {
       e.preventDefault();
@@ -165,13 +189,19 @@ export function usePwa() {
   const install = useCallback(async () => {
     const prompt = installPromptRef.current;
     if (!prompt) return false;
-    await prompt.prompt();
-    const { outcome } = await prompt.userChoice;
+    // The deferred prompt is one-shot: clear it before prompting so a double
+    // tap can't call `prompt()` twice (Chrome throws on the second call) and
+    // any later tap falls back to the manual install instructions.
     installPromptRef.current = null;
-    // The deferred prompt is one-shot: clear the flag so any later tap falls
-    // back to the manual install instructions.
     setCanInstall(false);
-    if (outcome === "accepted") setInstalled(true);
+    try {
+      await prompt.prompt();
+      const { outcome } = await prompt.userChoice;
+      if (outcome === "accepted") setInstalled(true);
+    } catch {
+      // Already consumed or expired — let the caller show the manual steps.
+      return false;
+    }
     return true;
   }, []);
 
