@@ -34,6 +34,13 @@ import {
   DrawerClose,
 } from "@/components/ui/drawer";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Toaster } from "@/components/ui/sonner";
 import { toast } from "sonner";
 import {
@@ -519,6 +526,17 @@ function App() {
   );
 }
 
+const ROUTE_TYPES = [
+  { value: "Fixed Route", label: "Fixed Route" },
+  { value: "Unfixed Route", label: "Unfixed Route" },
+] as const;
+
+const VEHICLE_TYPES = [
+  { value: "Minibus", label: "Minibus", defaultCapacity: 14 },
+  { value: "Keke", label: "Keke", defaultCapacity: 3 },
+  { value: "Private Car", label: "Private Car", defaultCapacity: 4 },
+] as const;
+
 // ========== NEW TRIP FORM (no fare) ==========
 function NewTripForm({
   onStart,
@@ -566,26 +584,31 @@ function NewTripForm({
     <Card className="p-4 shadow-card sm:p-5">
       <form onSubmit={submit} className="space-y-4">
         <div className="space-y-2">
-          <Label>Origin</Label>
+          <Label htmlFor="trip-origin">Origin</Label>
           <Input
+            id="trip-origin"
             value={origin}
             onChange={(e) => setOrigin(e.target.value)}
             maxLength={80}
             placeholder="e.g. Central Station"
+            required
           />
         </div>
         <div className="space-y-2">
-          <Label>Destination</Label>
+          <Label htmlFor="trip-destination">Destination</Label>
           <Input
+            id="trip-destination"
             value={destination}
             onChange={(e) => setDestination(e.target.value)}
             maxLength={80}
             placeholder="e.g. Airport"
+            required
           />
         </div>
         <div className="space-y-2">
-          <Label>Passengers @ start</Label>
+          <Label htmlFor="trip-pax">Passengers @ start</Label>
           <Input
+            id="trip-pax"
             inputMode="numeric"
             value={pax}
             onChange={(e) => setPax(e.target.value)}
@@ -593,29 +616,48 @@ function NewTripForm({
           />
         </div>
         <div className="space-y-2">
-          <Label>Route type</Label>
-          <Input
-            value={routeType}
-            onChange={(e) => setRouteType(e.target.value)}
-            maxLength={80}
-            placeholder="e.g. Fixed-Route"
-          />
-          <p className="text-xs text-muted-foreground">
-            Optional free text (e.g. Fixed-Route, Charter Service) — separate from vehicle type.
-          </p>
+          <Label htmlFor="trip-route-type">Route type</Label>
+          <Select value={routeType} onValueChange={setRouteType}>
+            <SelectTrigger id="trip-route-type" className="w-full">
+              <SelectValue placeholder="Select route type" />
+            </SelectTrigger>
+            <SelectContent>
+              {ROUTE_TYPES.map((rt) => (
+                <SelectItem key={rt.value} value={rt.value}>
+                  {rt.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
         <div className="space-y-2">
-          <Label>Vehicle type</Label>
-          <Input
+          <Label htmlFor="trip-vehicle-type">Vehicle type</Label>
+          <Select
             value={vehicleName}
-            onChange={(e) => setVehicleName(e.target.value)}
-            maxLength={60}
-            placeholder="e.g. Small Bus"
-          />
+            onValueChange={(val) => {
+              setVehicleName(val);
+              const found = VEHICLE_TYPES.find((v) => v.value === val);
+              if (found) {
+                setVehicleCapacity(String(found.defaultCapacity));
+              }
+            }}
+          >
+            <SelectTrigger id="trip-vehicle-type" className="w-full">
+              <SelectValue placeholder="Select vehicle type" />
+            </SelectTrigger>
+            <SelectContent>
+              {VEHICLE_TYPES.map((vt) => (
+                <SelectItem key={vt.value} value={vt.value}>
+                  {vt.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
         <div className="space-y-2">
-          <Label>Vehicle capacity</Label>
+          <Label htmlFor="trip-vehicle-capacity">Vehicle capacity</Label>
           <Input
+            id="trip-vehicle-capacity"
             inputMode="numeric"
             value={vehicleCapacity}
             onChange={(e) => setVehicleCapacity(e.target.value)}

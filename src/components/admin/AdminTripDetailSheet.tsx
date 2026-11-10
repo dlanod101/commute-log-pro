@@ -260,7 +260,7 @@ export function AdminTripDetailSheet({ trip, open, onOpenChange, onSessionExpire
                   Route Type
                 </p>
                 <p className="mt-1 text-xs font-medium">
-                  {detail?.routeType || trip?.routeType || "Standard route"}
+                  {detail?.routeType || trip?.routeType || "—"}
                 </p>
               </div>
 
