@@ -114,95 +114,129 @@ export function AdminUserDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle>{isEdit ? "Edit user" : "Add user"}</DialogTitle>
-          <DialogDescription>
+      <DialogContent className="max-w-md w-full p-4 sm:p-6">
+        <DialogHeader className="space-y-1">
+          <DialogTitle className="text-base sm:text-lg">
+            {isEdit ? "Edit user account" : "Create new user"}
+          </DialogTitle>
+          <DialogDescription className="text-xs">
             {isEdit
-              ? "Update account details and access."
-              : "Create a new account. Admins can be given scope to manage it later."}
+              ? "Update profile information, password, and permissions."
+              : "Register an account for field operations or administrative access."}
           </DialogDescription>
         </DialogHeader>
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="admin-user-name">Name</Label>
+
+        <form onSubmit={handleSubmit} className="space-y-3.5 mt-2">
+          <div className="space-y-1.5">
+            <Label htmlFor="admin-user-name" className="text-xs">
+              Full Name
+            </Label>
             <Input
               id="admin-user-name"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder="Jane Driver"
+              placeholder="e.g. Jane Driver"
+              autoComplete="name"
+              autoCapitalize="words"
+              className="h-9 text-xs sm:text-sm"
             />
           </div>
-          <div className="space-y-2">
-            <Label htmlFor="admin-user-email">Email</Label>
+
+          <div className="space-y-1.5">
+            <Label htmlFor="admin-user-email" className="text-xs">
+              Email Address <span className="text-destructive">*</span>
+            </Label>
             <Input
               id="admin-user-email"
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              placeholder="you@example.com"
+              placeholder="e.g. driver@deygo.com"
               required
+              autoComplete="email"
+              autoCapitalize="none"
+              autoCorrect="off"
+              className="h-9 text-xs sm:text-sm"
             />
           </div>
-          <div className="space-y-2">
-            <Label htmlFor="admin-user-password">
-              {isEdit ? "New password (leave blank to keep)" : "Password"}
+
+          <div className="space-y-1.5">
+            <Label htmlFor="admin-user-password" className="text-xs">
+              {isEdit ? "New Password (leave blank to keep unchanged)" : "Password"}
+              {!isEdit && <span className="text-destructive"> *</span>}
             </Label>
             <Input
               id="admin-user-password"
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              placeholder={isEdit ? "••••••••" : "At least 6 characters"}
+              placeholder={isEdit ? "••••••••" : "Minimum 6 characters"}
               required={!isEdit}
               minLength={isEdit ? undefined : 6}
+              autoComplete={isEdit ? "new-password" : "new-password"}
+              className="h-9 text-xs sm:text-sm"
             />
           </div>
+
           {isSuperAdmin && (
-            <div className="space-y-2">
-              <Label>Role</Label>
+            <div className="space-y-1.5">
+              <Label className="text-xs">Account Role</Label>
               <Select value={role} onValueChange={(v) => setRole(v as AdminRole)}>
-                <SelectTrigger className="w-full">
+                <SelectTrigger className="w-full h-9 text-xs sm:text-sm">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="user">User</SelectItem>
-                  <SelectItem value="admin">Admin</SelectItem>
-                  <SelectItem value="superadmin">Superadmin</SelectItem>
+                  <SelectItem value="user">User (Driver / Field Operator)</SelectItem>
+                  <SelectItem value="admin">Admin (Fleet Manager)</SelectItem>
+                  <SelectItem value="superadmin">Superadmin (Full Control)</SelectItem>
                 </SelectContent>
               </Select>
             </div>
           )}
+
           {isEdit && (
-            <div className="flex items-center justify-between gap-4 rounded-md border p-3">
+            <div className="flex items-center justify-between gap-3 rounded-lg border bg-muted/20 p-3">
               <div>
-                <p className="text-sm font-medium">Account active</p>
-                <p className="text-xs text-muted-foreground">
-                  Disabling blocks sign-in and existing tokens.
+                <p className="text-xs font-medium">Account Status</p>
+                <p className="text-[11px] text-muted-foreground">
+                  Disabling immediately revokes access and signs the user out.
                 </p>
               </div>
               <Switch checked={isActive} onCheckedChange={setIsActive} />
             </div>
           )}
-          {error && <p className="text-xs text-destructive">{error}</p>}
-          <DialogFooter>
+
+          {error && (
+            <div className="rounded-md bg-destructive/10 p-2.5 text-xs text-destructive">
+              {error}
+            </div>
+          )}
+
+          <DialogFooter className="mt-4 flex-col sm:flex-row gap-2">
             <Button
               type="button"
               variant="outline"
+              size="sm"
               onClick={() => onOpenChange(false)}
               disabled={busy}
+              className="w-full sm:w-auto text-xs"
             >
               Cancel
             </Button>
-            <Button type="submit" disabled={busy} className="gap-1.5">
+            <Button
+              type="submit"
+              size="sm"
+              disabled={busy}
+              className="w-full sm:w-auto gap-1.5 text-xs font-medium"
+            >
               {busy ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
               ) : isEdit ? (
-                <UserPen className="h-4 w-4" />
+                <UserPen className="h-3.5 w-3.5" />
               ) : (
-                <UserPlus className="h-4 w-4" />
+                <UserPlus className="h-3.5 w-3.5" />
               )}
-              {isEdit ? "Save changes" : "Create user"}
+              {isEdit ? "Save changes" : "Create account"}
             </Button>
           </DialogFooter>
         </form>

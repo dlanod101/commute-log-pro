@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { ArrowUpFromLine, Download, Menu } from "lucide-react";
+import { ArrowUpFromLine, Download, Menu, X } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
@@ -14,6 +14,7 @@ import { usePwa } from "@/hooks/use-pwa";
 export function PwaFloatingActions() {
   const { canInstall, installed, ready, install } = usePwa();
   const [helpOpen, setHelpOpen] = useState(false);
+  const [dismissed, setDismissed] = useState(false);
 
   // `appinstalled` only fires for a real installation, so this can't be
   // confused with launching the app from the home screen.
@@ -31,7 +32,7 @@ export function PwaFloatingActions() {
   // as iOS Safari never fire that event, so the button would otherwise be
   // missing there entirely. Wait for `ready` so installed users don't see a
   // flash of the button on first paint.
-  if (!ready || installed) return null;
+  if (!ready || installed || dismissed) return null;
 
   const handleClick = async () => {
     if (canInstall) {
@@ -47,15 +48,25 @@ export function PwaFloatingActions() {
 
   return (
     <>
-      <div className="fixed bottom-0 left-0 right-0 z-50 flex flex-col gap-2 p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:bottom-4 sm:left-auto sm:right-4 sm:w-auto sm:p-0 sm:pb-0">
+      <div className="fixed bottom-2 left-3 right-3 z-40 flex items-center gap-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] sm:bottom-4 sm:left-auto sm:right-4 sm:w-auto sm:p-0 sm:pb-0">
         <Button
           type="button"
           size="lg"
-          className="w-full gap-2 rounded-full bg-gradient-hero shadow-elevated sm:w-auto sm:px-5"
+          className="flex-1 gap-2 rounded-full bg-gradient-hero shadow-elevated sm:flex-none sm:px-5"
           onClick={() => void handleClick()}
         >
           <Download className="h-4 w-4 shrink-0" />
           Install app
+        </Button>
+        <Button
+          type="button"
+          variant="secondary"
+          size="icon"
+          className="h-11 w-11 shrink-0 rounded-full shadow-card sm:hidden bg-background/90 backdrop-blur border text-muted-foreground hover:text-foreground"
+          onClick={() => setDismissed(true)}
+          title="Dismiss install banner"
+        >
+          <X className="h-4 w-4" />
         </Button>
       </div>
 

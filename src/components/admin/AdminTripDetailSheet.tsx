@@ -20,7 +20,9 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
+  CalendarDays,
   CloudDownload,
+  ExternalLink,
   Layers,
   Loader2,
   MapPin,
@@ -28,10 +30,11 @@ import {
   Shield,
   Truck,
   User,
-  CalendarDays,
+  Hash,
 } from "lucide-react";
 import { toast } from "sonner";
 import { formatDateTime } from "@/lib/utils";
+import { TripStatusBadge } from "./shared";
 
 type Props = {
   trip: AdminTrip | null;
@@ -40,27 +43,45 @@ type Props = {
   onSessionExpired: () => void;
 };
 
-function ObservationRow({ obs }: { obs: TripObservation }) {
+function ObservationRow({ obs, index }: { obs: TripObservation; index: number }) {
   const ts = typeof obs.ts === "number" ? new Date(obs.ts) : null;
-  const lat = typeof obs.lat === "number" ? obs.lat.toFixed(6) : null;
-  const lng = typeof obs.lng === "number" ? obs.lng.toFixed(6) : null;
+  const latNum = typeof obs.lat === "number" ? obs.lat : null;
+  const lngNum = typeof obs.lng === "number" ? obs.lng : null;
+  const lat = latNum !== null ? latNum.toFixed(6) : null;
+  const lng = lngNum !== null ? lngNum.toFixed(6) : null;
+  const hasCoords = lat !== null && lng !== null;
+
   return (
-    <li className="flex items-start justify-between gap-3 rounded-md border bg-muted/30 px-3 py-2">
-      <div className="min-w-0">
-        <p className="text-xs font-medium capitalize">
-          {obs.record_type?.replace(/_/g, " ") || "record"}
-        </p>
-        <p className="mt-0.5 font-mono text-[10px] text-muted-foreground">
-          {ts ? ts.toLocaleString(undefined, { dateStyle: "short", timeStyle: "medium" }) : "—"}
+    <li className="flex flex-col gap-1.5 rounded-lg border bg-card/60 p-2.5 transition-colors hover:bg-muted/40">
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex items-center gap-1.5 min-w-0">
+          <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary/10 text-[10px] font-bold text-primary">
+            {index + 1}
+          </span>
+          <p className="text-xs font-semibold capitalize truncate">
+            {obs.record_type?.replace(/_/g, " ") || "Record"}
+          </p>
+        </div>
+        <p className="font-mono text-[10px] text-muted-foreground shrink-0">
+          {ts
+            ? ts.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })
+            : "—"}
         </p>
       </div>
-      <div className="shrink-0 text-right font-mono text-[10px] text-muted-foreground">
-        {lat && lng ? (
-          <span>
-            {lat}, {lng}
-          </span>
-        ) : (
-          "—"
+
+      <div className="flex items-center justify-between gap-2 text-[11px] text-muted-foreground pt-1 border-t border-border/50">
+        <span className="font-mono truncate">{hasCoords ? `${lat}, ${lng}` : "No GPS fix"}</span>
+        {hasCoords && (
+          <a
+            href={`https://www.google.com/maps?q=${lat},${lng}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-0.5 text-[10px] font-medium text-primary hover:underline"
+            title="Open coordinates in maps"
+          >
+            <span>Map</span>
+            <ExternalLink className="h-2.5 w-2.5" />
+          </a>
         )}
       </div>
     </li>
@@ -137,16 +158,16 @@ export function AdminTripDetailSheet({ trip, open, onOpenChange, onSessionExpire
   };
 
   const meta = [
-    { icon: CalendarDays, label: "Date", value: formatDateTime(detail?.date ?? trip?.date) },
-    { icon: Truck, label: "Vehicle", value: detail?.vehicleType || trip?.vehicleType || "—" },
+    { icon: CalendarDays, label: "Date & Time", value: formatDateTime(detail?.date ?? trip?.date) },
+    { icon: Truck, label: "Vehicle Type", value: detail?.vehicleType || trip?.vehicleType || "—" },
     {
       icon: Shield,
       label: "Capacity",
-      value: detail?.passengerCapacity != null ? String(detail.passengerCapacity) : "—",
+      value: detail?.passengerCapacity != null ? `${detail.passengerCapacity} seats` : "—",
     },
     {
       icon: User,
-      label: "Owner",
+      label: "Driver / Owner",
       value:
         detail?.owner_name || detail?.owner_email || trip?.owner_name || trip?.owner_email || "—",
     },
@@ -154,23 +175,35 @@ export function AdminTripDetailSheet({ trip, open, onOpenChange, onSessionExpire
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="right" className="flex w-full flex-col p-4 sm:max-w-md sm:p-6">
-        <SheetHeader>
-          <SheetTitle className="flex items-center gap-2">
-            <MapPin className="h-5 w-5" />
-            {detail?.originDestination || trip?.originDestination || "Trip detail"}
+      <SheetContent
+        side="right"
+        className="flex w-full flex-col p-4 sm:max-w-md sm:p-6 overflow-hidden"
+      >
+        <SheetHeader className="space-y-1.5 pb-2 border-b">
+          <div className="flex items-center justify-between gap-2 pr-6">
+            <TripStatusBadge status={detail?.status || trip?.status} />
+            <Badge variant="outline" className="font-mono text-[10px]">
+              Unit: {detail?.unit_id || trip?.unit_id || "—"}
+            </Badge>
+          </div>
+          <SheetTitle className="flex items-start gap-2 text-base sm:text-lg leading-snug">
+            <MapPin className="h-5 w-5 shrink-0 text-primary mt-0.5" />
+            <span className="break-words">
+              {detail?.originDestination || trip?.originDestination || "Trip Detail"}
+            </span>
           </SheetTitle>
-          <SheetDescription className="break-all font-mono text-[11px]">
-            {trip?.tripId}
+          <SheetDescription className="break-all font-mono text-[11px] text-muted-foreground">
+            ID: {trip?.tripId}
           </SheetDescription>
         </SheetHeader>
 
-        <div className="mt-4 flex gap-2">
+        {/* Action Downloads Bar */}
+        <div className="mt-3 grid grid-cols-2 gap-2">
           <Button
             type="button"
             variant="outline"
             size="sm"
-            className="gap-1.5"
+            className="gap-1.5 h-9 text-xs font-medium"
             disabled={downloading !== null}
             onClick={() => download("csv")}
           >
@@ -179,13 +212,13 @@ export function AdminTripDetailSheet({ trip, open, onOpenChange, onSessionExpire
             ) : (
               <CloudDownload className="h-3.5 w-3.5" />
             )}
-            CSV ZIP
+            Download CSV
           </Button>
           <Button
             type="button"
             variant="outline"
             size="sm"
-            className="gap-1.5"
+            className="gap-1.5 h-9 text-xs font-medium"
             disabled={downloading !== null}
             onClick={() => download("shapefile")}
           >
@@ -194,65 +227,62 @@ export function AdminTripDetailSheet({ trip, open, onOpenChange, onSessionExpire
             ) : (
               <Layers className="h-3.5 w-3.5" />
             )}
-            Shapefile
+            Download SHP
           </Button>
-          <Badge variant="outline" className="ml-auto capitalize">
-            {detail?.status || trip?.status || "—"}
-          </Badge>
         </div>
 
-        <div className="mt-5 flex-1 space-y-4 overflow-y-auto pb-4">
+        {/* Scrollable details and observation list */}
+        <div className="mt-4 flex-1 space-y-4 overflow-y-auto pr-1 pb-6">
           {loading ? (
-            <div className="flex items-center justify-center gap-2 py-12 text-sm text-muted-foreground">
-              <Loader2 className="h-4 w-4 animate-spin" />
-              Loading trip…
+            <div className="flex flex-col items-center justify-center gap-2 py-16 text-sm text-muted-foreground">
+              <Loader2 className="h-6 w-6 animate-spin text-primary" />
+              <span>Loading trip details & points…</span>
             </div>
           ) : (
             <>
-              <div className="grid grid-cols-2 gap-3">
+              {/* Metadata Grid */}
+              <div className="grid grid-cols-2 gap-2.5">
                 {meta.map((m) => (
-                  <div key={m.label} className="rounded-md border p-3">
-                    <p className="flex items-center gap-1.5 text-[11px] uppercase tracking-wide text-muted-foreground">
-                      <m.icon className="h-3.5 w-3.5" />
-                      {m.label}
+                  <div key={m.label} className="rounded-lg border bg-muted/20 p-2.5">
+                    <p className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground truncate">
+                      <m.icon className="h-3 w-3 shrink-0" />
+                      <span>{m.label}</span>
                     </p>
-                    <p className="mt-1 text-sm font-medium leading-snug">{m.value}</p>
+                    <p className="mt-1 text-xs font-medium leading-snug break-words">{m.value}</p>
                   </div>
                 ))}
               </div>
-              <div className="rounded-md border p-3">
-                <p className="flex items-center gap-1.5 text-[11px] uppercase tracking-wide text-muted-foreground">
-                  <RouteIcon className="h-3.5 w-3.5" />
-                  Route type
+
+              {/* Route Type */}
+              <div className="rounded-lg border bg-muted/20 p-2.5">
+                <p className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                  <RouteIcon className="h-3 w-3 shrink-0" />
+                  Route Type
                 </p>
-                <p className="mt-1 text-sm font-medium leading-snug">
-                  {detail?.routeType || trip?.routeType || "—"}
-                </p>
-              </div>
-              <div className="rounded-md border p-3">
-                <p className="text-[11px] uppercase tracking-wide text-muted-foreground">
-                  Owner unit
-                </p>
-                <p className="mt-1 break-all font-mono text-xs">
-                  {detail?.unit_id || trip?.unit_id || "—"}
+                <p className="mt-1 text-xs font-medium">
+                  {detail?.routeType || trip?.routeType || "Standard route"}
                 </p>
               </div>
 
-              <div>
-                <p className="mb-2 text-sm font-medium">
-                  Observations
-                  <span className="ml-2 text-xs font-normal text-muted-foreground">
-                    {observations.length}
-                  </span>
-                </p>
-                {observations.length === 0 ? (
-                  <p className="rounded-md border border-dashed p-6 text-center text-sm text-muted-foreground">
-                    No observations recorded for this trip.
+              {/* Observations Section */}
+              <div className="pt-2">
+                <div className="flex items-center justify-between mb-2">
+                  <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                    Recorded Points ({observations.length})
                   </p>
+                  {observations.length > 0 && (
+                    <span className="text-[10px] text-muted-foreground">GPS tracking data</span>
+                  )}
+                </div>
+
+                {observations.length === 0 ? (
+                  <div className="rounded-lg border border-dashed p-6 text-center text-xs text-muted-foreground">
+                    No GPS observations recorded for this trip.
+                  </div>
                 ) : (
-                  <ul className="space-y-2">
-                    {observations.map((obs, i) => (
-                      <ObservationRow key={obs.id ?? i} obs={obs} />
+                  <ul className="space-y-1.5">
+                    {observations.map((obs, idx) => (
+                      <ObservationRow key={obs.id ?? `${obs.ts}-${idx}`} obs={obs} index={idx} />
                     ))}
                   </ul>
                 )}
