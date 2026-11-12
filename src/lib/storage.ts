@@ -63,3 +63,56 @@ export function haversine(a: { lat: number; lng: number }, b: { lat: number; lng
   const h = Math.sin(dLat / 2) ** 2 + Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLng / 2) ** 2;
   return 2 * R * Math.asin(Math.sqrt(h));
 }
+
+const ADMIN_ROUTE_TYPES_KEY = "transit_admin_route_types_v1";
+
+export function loadAdminRouteTypes(): Record<string, string> {
+  if (typeof window === "undefined") return {};
+  try {
+    return JSON.parse(localStorage.getItem(ADMIN_ROUTE_TYPES_KEY) || "{}");
+  } catch {
+    return {};
+  }
+}
+
+export function saveAdminRouteType(tripId: string, routeType: string) {
+  if (typeof window === "undefined" || !tripId) return;
+  try {
+    const existing = loadAdminRouteTypes();
+    existing[tripId] = routeType;
+    localStorage.setItem(ADMIN_ROUTE_TYPES_KEY, JSON.stringify(existing));
+  } catch {
+    /* ignore storage quota or private browsing errors */
+  }
+}
+
+export function resolveTripRouteType(
+  trip: { tripId?: string; id?: string; routeType?: string } & Record<string, unknown>,
+  overrides?: Record<string, string>,
+): string {
+  const id = trip.tripId || trip.id || "";
+  if (overrides && id && overrides[id]) return overrides[id];
+  const stored = loadAdminRouteTypes();
+  if (id && stored[id]) return stored[id];
+
+  // Try direct properties that might be returned in JSON
+  const direct =
+    trip.routeType ||
+    (trip as { route_type?: string }).route_type ||
+    (trip as { routeCategory?: string }).routeCategory ||
+    (trip as { route_category?: string }).route_category ||
+    (trip as { tripType?: string }).tripType ||
+    (trip as { trip_type?: string }).trip_type;
+  if (typeof direct === "string" && direct.trim() !== "") return direct.trim();
+
+  // Try matching local trips logged on this device
+  if (id) {
+    const local = loadTrips();
+    const found = local.find((t) => t.id === id);
+    if (found?.routeType?.trim()) return found.routeType.trim();
+  }
+
+  // Standard route type default for fleet trips
+  return "Fixed Route";
+}
+

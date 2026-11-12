@@ -1,6 +1,7 @@
 import { Outlet, Link, createRootRoute, HeadContent, Scripts } from "@tanstack/react-router";
 
 import appCss from "../styles.css?url";
+import { AuthSessionWatcher } from "@/components/AuthSessionWatcher";
 import { PwaFloatingActions } from "@/components/PwaFloatingActions";
 import { UpdatePopup } from "@/components/UpdatePopup";
 
@@ -100,6 +101,7 @@ function RootShell({ children }: { children: React.ReactNode }) {
 function RootComponent() {
   return (
     <>
+      <AuthSessionWatcher />
       <Outlet />
       <PwaFloatingActions />
       <UpdatePopup />

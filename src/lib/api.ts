@@ -3,7 +3,9 @@ import { prepareTripsForUpload } from "@/lib/tripGps";
 
 export const API_BASE = "https://data-collection-backend-chi.vercel.app";
 
-const TOKEN_KEY = "transit_auth_token_v1";
+export const TOKEN_KEY = "transit_auth_token_v1";
+export const AUTH_EXPIRED_EVENT = "auth:expired";
+export const AUTH_TOKEN_CHANGED_EVENT = "auth:token-changed";
 
 export type Token = {
   access_token: string;
@@ -17,14 +19,51 @@ export type User = {
   unit_id: string;
 };
 
+export function getTokenExpirationMs(token: string): number | null {
+  try {
+    const parts = token.split(".");
+    if (parts.length !== 3) return null;
+    const base64 = parts[1].replace(/-/g, "+").replace(/_/g, "/");
+    const padded = base64.padEnd(base64.length + ((4 - (base64.length % 4)) % 4), "=");
+    const payload = JSON.parse(atob(padded)) as { exp?: unknown };
+    if (typeof payload.exp !== "number" || !Number.isFinite(payload.exp)) {
+      return null;
+    }
+    return payload.exp * 1000;
+  } catch {
+    return null;
+  }
+}
+
+export function isTokenExpired(token: string): boolean {
+  const expMs = getTokenExpirationMs(token);
+  if (expMs === null) return false;
+  return Date.now() >= expMs;
+}
+
 export function loadToken(): string | null {
   if (typeof window === "undefined") return null;
-  return localStorage.getItem(TOKEN_KEY);
+  const token = localStorage.getItem(TOKEN_KEY);
+  if (!token) return null;
+  if (isTokenExpired(token)) {
+    localStorage.removeItem(TOKEN_KEY);
+    return null;
+  }
+  return token;
 }
 
 export function saveToken(token: string | null) {
+  if (typeof window === "undefined") return;
   if (!token) localStorage.removeItem(TOKEN_KEY);
   else localStorage.setItem(TOKEN_KEY, token);
+  window.dispatchEvent(new Event(AUTH_TOKEN_CHANGED_EVENT));
+}
+
+export function notifySessionExpired() {
+  saveToken(null);
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new Event(AUTH_EXPIRED_EVENT));
+  }
 }
 
 export class ApiError extends Error {
@@ -37,7 +76,7 @@ export class ApiError extends Error {
   }
 }
 
-async function fail(res: Response): Promise<never> {
+async function fail(res: Response, { handleUnauthorized = true } = {}): Promise<never> {
   let message = res.statusText || "Request failed";
   try {
     const data = await res.json();
@@ -49,16 +88,39 @@ async function fail(res: Response): Promise<never> {
   } catch {
     /* ignore */
   }
+  if (res.status === 401 && handleUnauthorized) {
+    notifySessionExpired();
+  }
   throw new ApiError(message, res.status);
 }
 
+async function resilientFetch(
+  input: RequestInfo | URL,
+  init?: RequestInit,
+  retries = 2,
+): Promise<Response> {
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    try {
+      return await fetch(input, init);
+    } catch {
+      if (attempt === retries) {
+        throw new Error(
+          "Unable to reach the server. Please check your internet connection or try again in a few moments.",
+        );
+      }
+      await new Promise((resolve) => setTimeout(resolve, 500 * Math.pow(2, attempt)));
+    }
+  }
+  return fetch(input, init);
+}
+
 export async function register(email: string, name: string, password: string): Promise<User> {
-  const res = await fetch(`${API_BASE}/api/v1/auth/register`, {
+  const res = await resilientFetch(`${API_BASE}/api/v1/auth/register`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ email, name: name || null, password }),
   });
-  if (!res.ok) await fail(res);
+  if (!res.ok) await fail(res, { handleUnauthorized: false });
   return res.json();
 }
 
@@ -67,17 +129,17 @@ export async function login(email: string, password: string): Promise<Token> {
   body.set("username", email);
   body.set("password", password);
 
-  const res = await fetch(`${API_BASE}/api/v1/auth/login`, {
+  const res = await resilientFetch(`${API_BASE}/api/v1/auth/login`, {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
     body,
   });
-  if (!res.ok) await fail(res);
+  if (!res.ok) await fail(res, { handleUnauthorized: false });
   return res.json();
 }
 
 export async function getMe(token: string): Promise<User> {
-  const res = await fetch(`${API_BASE}/api/v1/auth/me`, {
+  const res = await resilientFetch(`${API_BASE}/api/v1/auth/me`, {
     headers: { Authorization: `Bearer ${token}` },
   });
   if (!res.ok) await fail(res);
@@ -101,7 +163,7 @@ export type RemoteTripsResponse = {
 };
 
 export async function fetchRemoteTrips(token: string): Promise<RemoteTrip[]> {
-  const res = await fetch(`${API_BASE}/api/v1/data/trips`, {
+  const res = await resilientFetch(`${API_BASE}/api/v1/data/trips`, {
     headers: { Authorization: `Bearer ${token}` },
   });
   if (!res.ok) await fail(res);
@@ -110,7 +172,7 @@ export async function fetchRemoteTrips(token: string): Promise<RemoteTrip[]> {
 }
 
 export async function fetchVehicleTypes(token: string): Promise<VehicleType[]> {
-  const res = await fetch(`${API_BASE}/api/v1/data/vehicle-types`, {
+  const res = await resilientFetch(`${API_BASE}/api/v1/data/vehicle-types`, {
     headers: { Authorization: `Bearer ${token}` },
   });
   if (!res.ok) await fail(res);
@@ -144,7 +206,7 @@ export async function endTrip(
     body.fare = fare;
   }
 
-  const res = await fetch(`${API_BASE}/api/v1/data/trip/end`, {
+  const res = await resilientFetch(`${API_BASE}/api/v1/data/trip/end`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -166,7 +228,7 @@ async function downloadTripAttachment(
   token: string,
   fallbackFilename: string,
 ): Promise<void> {
-  const res = await fetch(`${API_BASE}${path}`, {
+  const res = await resilientFetch(`${API_BASE}${path}`, {
     headers: { Authorization: `Bearer ${token}` },
   });
   if (!res.ok) await fail(res);
@@ -210,7 +272,7 @@ export async function uploadTrips(trips: Trip[], token: string): Promise<UploadR
   });
   form.append("file", blob, "trips.json");
 
-  const res = await fetch(`${API_BASE}/api/v1/data/upload`, {
+  const res = await resilientFetch(`${API_BASE}/api/v1/data/upload`, {
     method: "POST",
     headers: { Authorization: `Bearer ${token}` },
     body: form,
