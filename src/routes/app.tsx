@@ -785,16 +785,18 @@ function ActiveTripView({
         <div className="grid grid-cols-2 gap-2 sm:gap-3">
           <Button
             size="lg"
+            variant="stop"
             onClick={() => setRegularOpen(true)}
-            className="h-auto min-h-14 flex-col gap-1 py-3 text-sm sm:h-16 sm:flex-row sm:gap-2 sm:text-base"
+            className="h-auto min-h-14 flex-col gap-1 py-3 text-sm font-semibold sm:h-16 sm:flex-row sm:gap-2 sm:text-base shadow-sm"
           >
             <Pause className="h-5 w-5 shrink-0" />
             Stop
           </Button>
           <Button
             size="lg"
+            variant="signal"
             onClick={() => setSignalOpen(true)}
-            className="h-auto min-h-14 flex-col gap-1 py-3 text-sm sm:h-16 sm:flex-row sm:gap-2 sm:text-base"
+            className="h-auto min-h-14 flex-col gap-1 py-3 text-sm font-semibold sm:h-16 sm:flex-row sm:gap-2 sm:text-base shadow-sm"
           >
             <Plus className="h-5 w-5 shrink-0" />
             Signal stop
@@ -804,7 +806,7 @@ function ActiveTripView({
           size="lg"
           variant="destructive"
           onClick={() => setEndOpen(true)}
-          className="h-auto min-h-14 w-full flex-col gap-1 py-3 text-sm sm:h-16 sm:flex-row sm:gap-2 sm:text-base"
+          className="h-auto min-h-14 w-full flex-col gap-1 py-3 text-sm font-semibold sm:h-16 sm:flex-row sm:gap-2 sm:text-base shadow-sm"
         >
           <Square className="h-5 w-5 shrink-0" />
           End trip
@@ -996,7 +998,7 @@ function StopDialog({
               <div className="grid grid-cols-2 gap-2">
                 <Button
                   type="button"
-                  variant={chosenType === "regular" ? "default" : "outline"}
+                  variant={chosenType === "regular" ? "stop" : "outline"}
                   className="w-full"
                   onClick={() => setChosenType("regular")}
                 >
@@ -1004,7 +1006,7 @@ function StopDialog({
                 </Button>
                 <Button
                   type="button"
-                  variant={chosenType === "signalized" ? "default" : "outline"}
+                  variant={chosenType === "signalized" ? "signal" : "outline"}
                   className="w-full"
                   onClick={() => setChosenType("signalized")}
                 >
@@ -1034,7 +1036,7 @@ function StopDialog({
             Cancel
           </Button>
           <Button
-            variant={destructive ? "destructive" : "default"}
+            variant={destructive ? "destructive" : stopType === "signalized" ? "signal" : "stop"}
             onClick={() => {
               const fareValue = destructive && fare.trim() !== "" ? Number(fare) : undefined;
               if (
@@ -1098,8 +1100,16 @@ function StopObservationsList({ stops }: { stops: Stop[] }) {
             <div key={stop.id} className="rounded-2xl border bg-muted/5 p-4 sm:p-5">
               <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
                 <div>
-                  <div className="text-[10px] uppercase tracking-widest text-muted-foreground sm:text-[11px]">
-                    {stop.type === "signalized" ? "Signal stop" : "Regular stop"}
+                  <div className="text-[10px] uppercase tracking-widest sm:text-[11px]">
+                    <span
+                      className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 font-medium ${
+                        stop.type === "signalized"
+                          ? "bg-amber-500/15 text-amber-700 dark:text-amber-400"
+                          : "bg-blue-600/15 text-blue-700 dark:text-blue-400"
+                      }`}
+                    >
+                      {stop.type === "signalized" ? "Signal stop" : "Regular stop"}
+                    </span>
                     {stop.intersectionName ? ` · ${stop.intersectionName}` : ""}
                   </div>
                   <div className="mt-1 font-semibold">{new Date(stop.ts).toLocaleTimeString()}</div>

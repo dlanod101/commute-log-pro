@@ -128,6 +128,8 @@
   --accent-foreground: oklch(0.984 0.003 247.858);
   --destructive: oklch(0.704 0.191 22.216);
   --destructive-foreground: oklch(0.984 0.003 247.858);
+  --signal: oklch(0.78 0.19 70);
+  --signal-foreground: oklch(0.18 0.04 250);
   --border: oklch(1 0 0 / 10%);
   --input: oklch(1 0 0 / 15%);
   --ring: oklch(0.551 0.027 264.364);
@@ -151,7 +153,8 @@
     border-color: var(--color-border);
   }
 
-  html, body {
+  html,
+  body {
     background-color: var(--color-background);
     color: var(--color-foreground);
     font-family: var(--font-display);
@@ -160,11 +163,21 @@
 }
 
 @layer utilities {
-  .bg-gradient-hero { background: var(--gradient-hero); }
-  .bg-gradient-signal { background: var(--gradient-signal); }
-  .shadow-elevated { box-shadow: var(--shadow-elevated); }
-  .shadow-card { box-shadow: var(--shadow-card); }
-  .font-mono { font-family: var(--font-mono); }
+  .bg-gradient-hero {
+    background: var(--gradient-hero);
+  }
+  .bg-gradient-signal {
+    background: var(--gradient-signal);
+  }
+  .shadow-elevated {
+    box-shadow: var(--shadow-elevated);
+  }
+  .shadow-card {
+    box-shadow: var(--shadow-card);
+  }
+  .font-mono {
+    font-family: var(--font-mono);
+  }
   .pb-safe {
     padding-bottom: max(1.5rem, env(safe-area-inset-bottom, 0px));
   }
