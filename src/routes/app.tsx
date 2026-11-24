@@ -247,13 +247,22 @@ function App() {
       stops: [...active.stops, s],
       endedAt: Date.now(),
       endStopId: s.id,
-      fare: fare ?? active.fare,
+      fare: fare ?? active.fare ?? 0,
       status: "completed",
     };
     const next = [ended, ...trips];
     setTrips(next);
-    saveTrips(next);
+    try {
+      saveTrips(next);
+    } catch (e) {
+      console.warn("Storage error saving trips:", e);
+    }
     setActive(null);
+    try {
+      saveActive(null);
+    } catch (e) {
+      console.warn("Storage error clearing active trip:", e);
+    }
     toast.success("Trip ended & saved to phone");
   };
 
@@ -477,7 +486,7 @@ function App() {
         onSessionExpired={handleSessionExpired}
       />
 
-      <main className="mx-auto max-w-3xl px-3 pb-28 pt-4 sm:px-4 sm:pb-24 sm:pt-6">
+      <main className="mx-auto max-w-3xl px-3 pb-36 pt-4 sm:px-4 sm:pb-24 sm:pt-6">
         {active ? (
           <ActiveTripView trip={active} now={now} onAddStop={addStop} onEnd={endTrip} />
         ) : (
@@ -855,6 +864,21 @@ function ActiveTripView({
   );
 }
 
+function parseFareInput(raw: string): number | null {
+  const trimmed = raw.trim();
+  if (trimmed === "") return 0;
+  let cleaned = trimmed.replace(/[₦$€£\s]/g, "");
+  if (/^\d{1,3}(,\d{3})+(\.\d+)?$/.test(cleaned)) {
+    cleaned = cleaned.replace(/,/g, "");
+  } else if (/^\d{1,3}(\.\d{3})+(,\d+)?$/.test(cleaned)) {
+    cleaned = cleaned.replace(/\./g, "").replace(",", ".");
+  } else {
+    cleaned = cleaned.replace(",", ".");
+  }
+  const val = Number(cleaned);
+  return Number.isFinite(val) && val >= 0 ? val : null;
+}
+
 // ========== STOP DIALOG (dwell measured on every stop; fare on end) ==========
 function StopDialog({
   open,
@@ -910,165 +934,213 @@ function StopDialog({
   const dwellSec = Math.round(dwellMs / 1000);
   void tick;
 
+  const handleSave = () => {
+    let fareValue: number | undefined = undefined;
+    if (destructive) {
+      const parsed = parseFareInput(fare);
+      if (parsed === null) {
+        toast.error("Please enter a valid fare number (or 0 if free).");
+        return;
+      }
+      fareValue = parsed;
+    }
+    // Unknown delay is omitted (never sent as 0, which would skew averages).
+    const cleanDelay = delay.trim().replace(",", ".");
+    const delayValue = Number(cleanDelay);
+    const delaySeconds =
+      cleanDelay !== "" && Number.isFinite(delayValue) && delayValue >= 0 ? delayValue : undefined;
+
+    onSubmit(
+      {
+        type: chosenType,
+        // Dwell is captured for every stop visit — signal and regular alike.
+        dwellSeconds: dwellSec,
+        delaySeconds,
+        boarding: Math.max(0, parseInt(board) || 0),
+        alighting: Math.max(0, parseInt(alight) || 0),
+        notes: notes.trim() || undefined,
+      },
+      fareValue,
+    );
+  };
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
-        className="max-h-[min(90vh,100dvh)] overflow-y-auto"
-        onPointerDownOutside={(e) => e.preventDefault()}
-        onInteractOutside={(e) => e.preventDefault()}
+        className="flex max-h-[88dvh] flex-col overflow-hidden p-0 sm:max-h-[85vh] sm:rounded-lg"
+        onPointerDownOutside={(e) => {
+          e.preventDefault();
+          if (document.activeElement instanceof HTMLElement) {
+            document.activeElement.blur();
+          }
+        }}
+        onInteractOutside={(e) => {
+          e.preventDefault();
+          if (document.activeElement instanceof HTMLElement) {
+            document.activeElement.blur();
+          }
+        }}
       >
-        <DialogHeader>
+        <DialogHeader className="shrink-0 border-b px-4 py-3 sm:px-6">
           <DialogTitle>{title}</DialogTitle>
         </DialogHeader>
-        <div className="space-y-4">
-          <div className="rounded-lg border bg-secondary/40 p-3">
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-              <div>
-                <div className="text-[10px] uppercase tracking-widest text-muted-foreground">
-                  Dwell time
+
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            handleSave();
+          }}
+          className="flex min-h-0 flex-1 flex-col overflow-hidden"
+        >
+          <div className="flex-1 overflow-y-auto overscroll-contain p-4 sm:p-6 space-y-4">
+            <div className="rounded-lg border bg-secondary/40 p-3">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <div className="text-[10px] uppercase tracking-widest text-muted-foreground">
+                    Dwell time
+                  </div>
+                  <div className="font-mono text-xl font-semibold tabular-nums sm:text-2xl">
+                    {fmtDuration(dwellMs)}
+                  </div>
                 </div>
-                <div className="font-mono text-xl font-semibold tabular-nums sm:text-2xl">
-                  {fmtDuration(dwellMs)}
-                </div>
-              </div>
-              <Button
-                type="button"
-                size="sm"
-                className="w-full shrink-0 sm:w-auto"
-                variant={dwellStart === null ? "default" : "outline"}
-                onClick={() => {
-                  if (dwellStart === null) {
-                    setDwellStart(Date.now());
-                  } else {
-                    setDwellPaused(dwellPaused + (Date.now() - dwellStart));
-                    setDwellStart(null);
-                  }
-                }}
-              >
-                {dwellStart === null ? "Resume" : "Stop timer"}
-              </Button>
-            </div>
-            <p className="mt-2 text-xs text-muted-foreground">
-              Time stopped at this stop. Auto-started — pause it when the vehicle moves.
-            </p>
-          </div>
-
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-2">
-              <Label>Boarding</Label>
-              <Input inputMode="numeric" value={board} onChange={(e) => setBoard(e.target.value)} />
-            </div>
-            <div className="space-y-2">
-              <Label>Alighting</Label>
-              <Input
-                inputMode="numeric"
-                value={alight}
-                onChange={(e) => setAlight(e.target.value)}
-              />
-            </div>
-          </div>
-
-          <div className="space-y-2">
-            <Label>Delay time (seconds)</Label>
-            <Input
-              inputMode="decimal"
-              value={delay}
-              onChange={(e) => setDelay(e.target.value)}
-              placeholder="Optional"
-            />
-            <p className="text-xs text-muted-foreground">
-              Extra delay at this stop. Recorded separately from dwell time.
-            </p>
-          </div>
-
-          <div className="space-y-2">
-            <Label>Observation (optional)</Label>
-            <Textarea
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              maxLength={500}
-              placeholder="Enter observations for this stop…"
-              rows={3}
-            />
-          </div>
-
-          {showStopTypePicker && (
-            <div className="space-y-2">
-              <Label>Stop type</Label>
-              <div className="grid grid-cols-2 gap-2">
                 <Button
                   type="button"
-                  variant={chosenType === "regular" ? "stop" : "outline"}
-                  className="w-full"
-                  onClick={() => setChosenType("regular")}
+                  size="sm"
+                  className="w-full shrink-0 sm:w-auto"
+                  variant={dwellStart === null ? "default" : "outline"}
+                  onClick={() => {
+                    if (dwellStart === null) {
+                      setDwellStart(Date.now());
+                    } else {
+                      setDwellPaused(dwellPaused + (Date.now() - dwellStart));
+                      setDwellStart(null);
+                    }
+                  }}
                 >
-                  Regular
-                </Button>
-                <Button
-                  type="button"
-                  variant={chosenType === "signalized" ? "signal" : "outline"}
-                  className="w-full"
-                  onClick={() => setChosenType("signalized")}
-                >
-                  Signal
+                  {dwellStart === null ? "Resume" : "Stop timer"}
                 </Button>
               </div>
-              <p className="text-xs text-muted-foreground">
-                Defaults to Regular. Choose Signal only if this stop is at a traffic signal.
+              <p className="mt-2 text-xs text-muted-foreground">
+                Time stopped at this stop. Auto-started — pause it when the vehicle moves.
               </p>
             </div>
-          )}
 
-          {destructive && (
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-2">
+                <Label htmlFor="stop-boarding">Boarding</Label>
+                <Input
+                  id="stop-boarding"
+                  inputMode="numeric"
+                  value={board}
+                  onChange={(e) => setBoard(e.target.value)}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="stop-alighting">Alighting</Label>
+                <Input
+                  id="stop-alighting"
+                  inputMode="numeric"
+                  value={alight}
+                  onChange={(e) => setAlight(e.target.value)}
+                />
+              </div>
+            </div>
+
             <div className="space-y-2">
-              <Label>Total fare (₦) *</Label>
+              <Label htmlFor="stop-delay">Delay time (seconds)</Label>
               <Input
+                id="stop-delay"
                 inputMode="decimal"
-                value={fare}
-                onChange={(e) => setFare(e.target.value)}
-                placeholder="Required"
+                value={delay}
+                onChange={(e) => setDelay(e.target.value)}
+                placeholder="Optional"
+              />
+              <p className="text-xs text-muted-foreground">
+                Extra delay at this stop. Recorded separately from dwell time.
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="stop-notes">Observation (optional)</Label>
+              <Textarea
+                id="stop-notes"
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+                maxLength={500}
+                placeholder="Enter observations for this stop…"
+                rows={3}
               />
             </div>
-          )}
-        </div>
-        <DialogFooter>
-          <Button variant="ghost" onClick={() => onOpenChange(false)}>
-            Cancel
-          </Button>
-          <Button
-            variant={destructive ? "destructive" : stopType === "signalized" ? "signal" : "stop"}
-            onClick={() => {
-              const fareValue = destructive && fare.trim() !== "" ? Number(fare) : undefined;
-              if (
-                destructive &&
-                (fareValue === undefined || Number.isNaN(fareValue) || fareValue < 0)
-              ) {
-                toast.error("A valid total fare is required to end the trip.");
-                return;
-              }
-              // Unknown delay is omitted (never sent as 0, which would skew averages).
-              const delayValue = Number(delay);
-              const delaySeconds =
-                delay.trim() !== "" && Number.isFinite(delayValue) && delayValue >= 0
-                  ? delayValue
-                  : undefined;
-              onSubmit(
-                {
-                  type: chosenType,
-                  // Dwell is captured for every stop visit — signal and regular alike.
-                  dwellSeconds: dwellSec,
-                  delaySeconds,
-                  boarding: Math.max(0, parseInt(board) || 0),
-                  alighting: Math.max(0, parseInt(alight) || 0),
-                  notes: notes.trim() || undefined,
-                },
-                fareValue,
-              );
-            }}
-          >
-            {submitLabel}
-          </Button>
-        </DialogFooter>
+
+            {showStopTypePicker && (
+              <div className="space-y-2">
+                <Label>Stop type</Label>
+                <div className="grid grid-cols-2 gap-2">
+                  <Button
+                    type="button"
+                    variant={chosenType === "regular" ? "stop" : "outline"}
+                    className="w-full"
+                    onClick={() => setChosenType("regular")}
+                  >
+                    Regular
+                  </Button>
+                  <Button
+                    type="button"
+                    variant={chosenType === "signalized" ? "signal" : "outline"}
+                    className="w-full"
+                    onClick={() => setChosenType("signalized")}
+                  >
+                    Signal
+                  </Button>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Defaults to Regular. Choose Signal only if this stop is at a traffic signal.
+                </p>
+              </div>
+            )}
+
+            {destructive && (
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="trip-fare">Total fare (₦)</Label>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (document.activeElement instanceof HTMLElement) {
+                        document.activeElement.blur();
+                      }
+                    }}
+                    className="text-xs text-primary font-medium hover:underline sm:hidden"
+                  >
+                    Done typing
+                  </button>
+                </div>
+                <Input
+                  id="trip-fare"
+                  inputMode="decimal"
+                  autoComplete="off"
+                  autoCorrect="off"
+                  value={fare}
+                  onChange={(e) => setFare(e.target.value)}
+                  placeholder="0 (or enter total fare collected)"
+                />
+                <p className="text-xs text-muted-foreground">Enter 0 if no fare was collected.</p>
+              </div>
+            )}
+          </div>
+
+          <DialogFooter className="shrink-0 border-t bg-background/95 backdrop-blur px-4 py-3 sm:px-6 flex flex-row items-center justify-end gap-2">
+            <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>
+              Cancel
+            </Button>
+            <Button
+              type="submit"
+              variant={destructive ? "destructive" : stopType === "signalized" ? "signal" : "stop"}
+            >
+              {submitLabel}
+            </Button>
+          </DialogFooter>
+        </form>
       </DialogContent>
     </Dialog>
   );

@@ -35,7 +35,41 @@ export function loadTrips(): Trip[] {
 }
 
 export function saveTrips(trips: Trip[]) {
-  localStorage.setItem(KEY, JSON.stringify(trips));
+  if (typeof window === "undefined") return;
+  try {
+    localStorage.setItem(KEY, JSON.stringify(trips));
+  } catch (err) {
+    console.warn("localStorage quota exceeded in saveTrips, attempting cleanup...", err);
+    // On iOS Safari, quota is typically 5MB.
+    // 1. Strip heavy GPS point arrays from trips that are already uploaded.
+    try {
+      const trimmed = trips.map((t) => {
+        if (t.uploaded && t.gps.length > 2) {
+          return {
+            ...t,
+            gps: [t.gps[0], t.gps[t.gps.length - 1]],
+          };
+        }
+        return t;
+      });
+      localStorage.setItem(KEY, JSON.stringify(trimmed));
+      return;
+    } catch {
+      // 2. If still full, prune older uploaded trips to ensure current trips are saved
+      try {
+        const pendingOnly = trips.filter((t) => !t.uploaded);
+        localStorage.setItem(KEY, JSON.stringify(pendingOnly));
+        return;
+      } catch {
+        // 3. Fallback: keep at least the most recent trips
+        try {
+          localStorage.setItem(KEY, JSON.stringify(trips.slice(0, 5)));
+        } catch {
+          console.error("Critical: unable to persist trips to localStorage");
+        }
+      }
+    }
+  }
 }
 
 export function loadActive(): Trip | null {
@@ -49,8 +83,28 @@ export function loadActive(): Trip | null {
 }
 
 export function saveActive(trip: Trip | null) {
-  if (!trip) localStorage.removeItem(ACTIVE);
-  else localStorage.setItem(ACTIVE, JSON.stringify(trip));
+  if (typeof window === "undefined") return;
+  try {
+    if (!trip) {
+      localStorage.removeItem(ACTIVE);
+    } else {
+      localStorage.setItem(ACTIVE, JSON.stringify(trip));
+    }
+  } catch (err) {
+    console.warn("localStorage quota exceeded in saveActive:", err);
+    if (trip && trip.gps.length > 50) {
+      try {
+        // Thin GPS track in storage so active trip can still be restored on refresh
+        const thinned = {
+          ...trip,
+          gps: trip.gps.filter((_, i) => i % 5 === 0 || i === trip.gps.length - 1),
+        };
+        localStorage.setItem(ACTIVE, JSON.stringify(thinned));
+      } catch {
+        /* Ignore */
+      }
+    }
+  }
 }
 
 export function haversine(a: { lat: number; lng: number }, b: { lat: number; lng: number }) {
@@ -115,4 +169,3 @@ export function resolveTripRouteType(
   // Standard route type default for fleet trips
   return "Fixed Route";
 }
-

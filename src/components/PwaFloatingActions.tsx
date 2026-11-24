@@ -32,7 +32,12 @@ export function PwaFloatingActions() {
   // as iOS Safari never fire that event, so the button would otherwise be
   // missing there entirely. Wait for `ready` so installed users don't see a
   // flash of the button on first paint.
-  if (!ready || installed || dismissed) return null;
+  // Also suppress the floating banner during an active trip so it does not
+  // cover or obstruct the driver's trip action buttons on iOS/mobile screens.
+  const hasActiveTrip =
+    typeof window !== "undefined" && !!localStorage.getItem("transit_active_trip_v1");
+
+  if (!ready || installed || dismissed || hasActiveTrip) return null;
 
   const handleClick = async () => {
     if (canInstall) {
