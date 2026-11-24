@@ -51,6 +51,7 @@ import {
   Route as RouteIcon,
   Upload,
   Trash2,
+  Pencil,
   Wifi,
   WifiOff,
   LogOut,
@@ -271,6 +272,13 @@ function App() {
     setTrips(next);
     saveTrips(next);
     toast.success("Trip deleted");
+  };
+
+  const updateTripFare = (id: string, fare: number) => {
+    const next = trips.map((t) => (t.id === id ? { ...t, fare } : t));
+    setTrips(next);
+    saveTrips(next);
+    toast.success("Trip fare updated");
   };
 
   const uploadAll = async () => {
@@ -525,7 +533,12 @@ function App() {
                 </Card>
               )}
               {trips.map((t) => (
-                <TripCard key={t.id} trip={t} onDelete={() => deleteTrip(t.id)} />
+                <TripCard
+                  key={t.id}
+                  trip={t}
+                  onDelete={() => deleteTrip(t.id)}
+                  onUpdateFare={(newFare) => updateTripFare(t.id, newFare)}
+                />
               ))}
             </TabsContent>
           </Tabs>
@@ -866,7 +879,7 @@ function ActiveTripView({
 
 function parseFareInput(raw: string): number | null {
   const trimmed = raw.trim();
-  if (trimmed === "") return 0;
+  if (trimmed === "") return null;
   let cleaned = trimmed.replace(/[₦$€£\s]/g, "");
   if (/^\d{1,3}(,\d{3})+(\.\d+)?$/.test(cleaned)) {
     cleaned = cleaned.replace(/,/g, "");
@@ -937,6 +950,10 @@ function StopDialog({
   const handleSave = () => {
     let fareValue: number | undefined = undefined;
     if (destructive) {
+      if (fare.trim() === "") {
+        toast.error("Total fare is required to end the trip.");
+        return;
+      }
       const parsed = parseFareInput(fare);
       if (parsed === null) {
         toast.error("Please enter a valid fare number (or 0 if free).");
@@ -1207,49 +1224,153 @@ function StopObservationsList({ stops }: { stops: Stop[] }) {
   );
 }
 
-function TripCard({ trip, onDelete }: { trip: Trip; onDelete: () => void }) {
+function TripCard({
+  trip,
+  onDelete,
+  onUpdateFare,
+}: {
+  trip: Trip;
+  onDelete: () => void;
+  onUpdateFare?: (fare: number) => void;
+}) {
   const dur = (trip.endedAt ?? trip.startedAt) - trip.startedAt;
+  const [editFareOpen, setEditFareOpen] = useState(false);
+  const [fareInput, setFareInput] = useState(trip.fare != null ? String(trip.fare) : "");
+
+  const handleSaveFare = () => {
+    if (fareInput.trim() === "") {
+      toast.error("Please enter a fare amount (or 0 if free).");
+      return;
+    }
+    const parsed = parseFareInput(fareInput);
+    if (parsed === null) {
+      toast.error("Please enter a valid fare number.");
+      return;
+    }
+    onUpdateFare?.(parsed);
+    setEditFareOpen(false);
+  };
+
   return (
-    <Card className="p-3 shadow-card sm:p-4">
-      <div className="flex items-start justify-between gap-2 sm:gap-3">
-        <div className="min-w-0 flex-1">
-          <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
-            <Badge variant={trip.uploaded ? "default" : "outline"} className="text-[10px]">
-              {trip.uploaded ? "UPLOADED" : "ON DEVICE"}
-            </Badge>
-            <span className="font-mono text-[10px] text-muted-foreground">{trip.id}</span>
+    <>
+      <Card className="p-3 shadow-card sm:p-4">
+        <div className="flex items-start justify-between gap-2 sm:gap-3">
+          <div className="min-w-0 flex-1">
+            <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
+              <Badge variant={trip.uploaded ? "default" : "outline"} className="text-[10px]">
+                {trip.uploaded ? "UPLOADED" : "ON DEVICE"}
+              </Badge>
+              <span className="font-mono text-[10px] text-muted-foreground">{trip.id}</span>
+            </div>
+            <div className="mt-1 text-sm font-semibold leading-snug sm:truncate">
+              {trip.origin} → {trip.destination}
+            </div>
+            <div className="mt-1 text-xs text-muted-foreground">
+              {new Date(trip.startedAt).toLocaleString()}
+            </div>
+            {trip.routeType && (
+              <p className="mt-1 inline-flex items-center gap-1 text-[11px] font-medium text-muted-foreground">
+                <RouteIcon className="h-3 w-3 text-accent" />
+                {trip.routeType}
+              </p>
+            )}
           </div>
-          <div className="mt-1 text-sm font-semibold leading-snug sm:truncate">
-            {trip.origin} → {trip.destination}
+          <Button size="icon" variant="ghost" onClick={onDelete} title="Delete trip">
+            <Trash2 className="h-4 w-4" />
+          </Button>
+        </div>
+
+        <div className="mt-3 grid grid-cols-4 gap-1.5 rounded-lg bg-muted/40 p-2 text-center sm:gap-2">
+          <div>
+            <div className="font-mono text-xs font-semibold sm:text-sm">{fmtDuration(dur)}</div>
+            <div className="text-[10px] text-muted-foreground">time</div>
           </div>
-          <div className="mt-1 text-xs text-muted-foreground">
-            {new Date(trip.startedAt).toLocaleString()}
+          <div>
+            <div className="font-mono text-xs font-semibold sm:text-sm">
+              {fmtKm(trip.distanceMeters)}
+            </div>
+            <div className="text-[10px] text-muted-foreground">distance</div>
           </div>
-          {trip.routeType && (
-            <p className="mt-1 inline-flex items-center gap-1 text-[11px] font-medium text-muted-foreground">
-              <RouteIcon className="h-3 w-3 text-accent" />
-              {trip.routeType}
+          <div>
+            <div className="font-mono text-xs font-semibold sm:text-sm">{trip.stops.length}</div>
+            <div className="text-[10px] text-muted-foreground">stops</div>
+          </div>
+          <div>
+            <div className="font-mono text-xs font-semibold sm:text-sm text-foreground">
+              {trip.fare != null ? `₦${trip.fare.toLocaleString()}` : "—"}
+            </div>
+            <div className="text-[10px] text-muted-foreground">fare</div>
+          </div>
+        </div>
+
+        {!trip.uploaded && (
+          <div className="mt-2.5 flex items-center justify-between border-t pt-2">
+            <span className="text-xs text-muted-foreground">
+              {trip.fare == null || trip.fare === 0 ? (
+                <span className="font-medium text-amber-600 dark:text-amber-400">
+                  Fare: ₦0 (Needs update?)
+                </span>
+              ) : (
+                <span>
+                  Total fare:{" "}
+                  <strong className="font-mono text-foreground">
+                    ₦{trip.fare.toLocaleString()}
+                  </strong>
+                </span>
+              )}
+            </span>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="h-7 text-xs gap-1.5"
+              onClick={() => {
+                setFareInput(trip.fare != null ? String(trip.fare) : "");
+                setEditFareOpen(true);
+              }}
+            >
+              <Pencil className="h-3 w-3" />
+              Edit fare
+            </Button>
+          </div>
+        )}
+      </Card>
+
+      <Dialog open={editFareOpen} onOpenChange={setEditFareOpen}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Edit trip fare</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3 py-2">
+            <p className="text-xs text-muted-foreground">
+              Update the total fare collected for trip from <strong>{trip.origin}</strong> to{" "}
+              <strong>{trip.destination}</strong>.
             </p>
-          )}
-        </div>
-        <Button size="icon" variant="ghost" onClick={onDelete}>
-          <Trash2 className="h-4 w-4" />
-        </Button>
-      </div>
-      <div className="mt-3 grid grid-cols-3 gap-2 text-center">
-        <div>
-          <div className="font-mono text-sm font-semibold">{fmtDuration(dur)}</div>
-          <div className="text-[10px] text-muted-foreground">time</div>
-        </div>
-        <div>
-          <div className="font-mono text-sm font-semibold">{fmtKm(trip.distanceMeters)}</div>
-          <div className="text-[10px] text-muted-foreground">distance</div>
-        </div>
-        <div>
-          <div className="font-mono text-sm font-semibold">{trip.stops.length}</div>
-          <div className="text-[10px] text-muted-foreground">stops</div>
-        </div>
-      </div>
-    </Card>
+            <div className="space-y-1.5">
+              <Label htmlFor="edit-fare-input">Total fare (₦) *</Label>
+              <Input
+                id="edit-fare-input"
+                inputMode="decimal"
+                autoComplete="off"
+                autoCorrect="off"
+                value={fareInput}
+                onChange={(e) => setFareInput(e.target.value)}
+                placeholder="e.g. 500 (or 0 if free)"
+                className="font-mono"
+                autoFocus
+              />
+            </div>
+          </div>
+          <DialogFooter className="flex flex-row justify-end gap-2">
+            <Button type="button" variant="ghost" onClick={() => setEditFareOpen(false)}>
+              Cancel
+            </Button>
+            <Button type="button" onClick={handleSaveFare}>
+              Save fare
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }
